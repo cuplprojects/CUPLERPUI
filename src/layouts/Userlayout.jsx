@@ -62,7 +62,7 @@ const UserLayout = () => {
               <Route path="/change-password" element={<ChangePassword />} />
 
               <Route path="/quantity-sheet-uploads/:encryptedProjectId" element={checkPermissionAndRender("6", QtySheetUpload)} />
-              <Route path="/project-details/:encryptedProjectId/:encryptedLotNo" element={<ProcessTable />} />
+              <Route path="/project-details/:encryptedProjectId" element={<ProcessTable />} />
               <Route path="/labels" element={checkPermissionAndRender("3", Labels)} />
               <Route path="/reports" element={checkPermissionAndRender("4", Reports)} />
 

@@ -1589,7 +1589,9 @@ console.log(tableData)
           <Col lg={1} md={1} xs={2} className="mt-md-1 mt-xs-1">
             {selectedRowKeys.length > 1 && getSelectedStatus() !== null && (
               <div className="mt-1 d-flex align-items-center">
-                <span
+                {
+                  hasFeaturePermission(8) && (
+                     <span
                   className={`me-2 ${customDark === "dark-dark"
                     ? "text-white"
                     : "custom-theme-dark-text"
@@ -1597,6 +1599,9 @@ console.log(tableData)
                 >
                   {t("updateStatus")}
                 </span>
+                  )
+                }
+               
                 {(() => {
                   const requirements = [];
                   const selectedRows = selectedRowKeys

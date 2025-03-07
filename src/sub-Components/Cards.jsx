@@ -82,7 +82,9 @@ const Cards = ({ item, onclick, disableProject, activeCardStyle }) => {
       }
     }
   };
-
+     const setLotInLocal = (lt) => {
+        localStorage.setItem("selectedLot", lt)
+      }
   // Navigate to the dashboard and send projectId as a route parameter
   const handleCardClick = () => {
     if (!disableProject) {
@@ -93,6 +95,7 @@ const Cards = ({ item, onclick, disableProject, activeCardStyle }) => {
       return;
     }
     if (supervisor) {
+      setLotInLocal(1)
       navigate(`/project-details/${encrypt(item.projectId)}/${encrypt(1)}`);
     } else {
       navigate(`/dashboard/${encrypt(item.projectId)}`);

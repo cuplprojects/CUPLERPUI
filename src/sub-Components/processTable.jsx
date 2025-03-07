@@ -13,10 +13,10 @@ import { useStore } from "zustand";
 import { useTranslation } from "react-i18next";
 import API from "../CustomHooks/MasterApiHooks/api";
 import { useUserData } from "../store/userDataStore";
-import {getProjectProcessAndFeature, getProjectProcessByProjectAndSequence,} from "../CustomHooks/ApiServices/projectProcessAndFeatureService";
+import { getProjectProcessAndFeature, getProjectProcessByProjectAndSequence, } from "../CustomHooks/ApiServices/projectProcessAndFeatureService";
 import useCurrentProcessStore from "../store/currentProcessStore";
 import { decrypt } from "../Security/Security";
-import {getCombinedPercentages,getProjectTransactionsData,} from "../CustomHooks/ApiServices/transacationService";
+import { getCombinedPercentages, getProjectTransactionsData, } from "../CustomHooks/ApiServices/transacationService";
 import ToggleProject from "../pages/processPage/Components/ToggleProject";
 import ToggleProcess from "../pages/processPage/Components/ToggleProcess";
 import PreviousProcess from "../pages/processPage/Components/PreviousProcess";
@@ -25,11 +25,11 @@ import DispatchPage from "../pages/dispatchPage/DispatchPage";
 import { IoIosArrowDropdownCircle } from "react-icons/io";
 import { Collapse } from "react-bootstrap";
 import ProcessProgressTrain from "./ProcessProgressTrain";
+import ProcessTrainModals from "./ProcessTrainModals ";
 
 const ProcessTable = () => {
-  const { encryptedProjectId, encryptedLotNo } = useParams();
+  const { encryptedProjectId } = useParams();
   const id = decrypt(encryptedProjectId);
-  const lotNo = decrypt(encryptedLotNo);
   const [featureData, setFeatureData] = useState(null);
   const { processId, processName } = useCurrentProcessStore();
   const { setProcess } = useCurrentProcessStore((state) => state.actions);
@@ -43,7 +43,7 @@ const ProcessTable = () => {
     localStorage.setItem('processTableHeaderOpen', JSON.stringify(isHeaderOpen));
   }, [isHeaderOpen]);
   const { t } = useTranslation();
-  
+
 
   useEffect(() => {
     localStorage.setItem('processTableHeaderOpen', JSON.stringify(isHeaderOpen));
@@ -72,7 +72,8 @@ const ProcessTable = () => {
   const [showBarChart, setShowBarChart] = useState(false);
   const [catchDetailModalShow, setCatchDetailModalShow] = useState(false);
   const [catchDetailModalData, setCatchDetailModalData] = useState(null);
-  const [selectedLot, setSelectedLot] = useState(lotNo);
+  const [selectedLot, setSelectedLot] = useState(
+    localStorage.getItem('selectedLot') );
   const [projectName, setProjectName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [projectLots, setProjectLots] = useState([]);
@@ -95,7 +96,12 @@ const ProcessTable = () => {
     process: null,
     transactions: []
   });
-
+  // processs train states
+  const [showProcessTrain, setShowProcessTrain] = useState(false);
+  const [processTrainData, setProcessTrainData] = useState([]);
+  const [selectedStatus, setSelectedStatus] = useState(null);
+  const [selectedProcessId, setSelectedProcessId] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     fetchCombinedPercentages();
@@ -275,6 +281,10 @@ const ProcessTable = () => {
     fetchDigitalOrOffsetData();
   }, [selectedProject, previousProcess, id]);
 
+  const setLotInLocal = (lt) => {
+    localStorage.setItem("selectedLot", lt)
+  }
+
   const handleProjectChange = async (selectedProject) => {
     if (!selectedProject || selectedProject.value === id) return;
     setSelectedProject(null);
@@ -328,6 +338,7 @@ const ProcessTable = () => {
           setProjectLots(uniqueLots.map((lotNo) => ({ lotNo })));
           if (uniqueLots.length > 0) {
             setSelectedLot(uniqueLots[0]);
+            setLotInLocal(uniqueLots[0])
           }
         }
         if (firstProcess.sequence > 1) {
@@ -733,6 +744,7 @@ const ProcessTable = () => {
   const handleLotClick = async (lot) => {
     if (lot !== selectedLot) {
       setSelectedLot(lot);
+      setLotInLocal(lot)
       setIsLoading(true);
       try {
         const response = await getProjectTransactionsData(
@@ -779,7 +791,7 @@ const ProcessTable = () => {
       processName !== "Offset Printing" &&
       processName !== "CTP" &&
       processName !== "Cutting" &&
-      processName !== "Proofreading" 
+      processName !== "Proofreading"
       ? tableData.reduce((acc, item) => {
         const existingItem = acc.find(
           (i) => i.catchNumber === item.catchNumber
@@ -855,8 +867,8 @@ const ProcessTable = () => {
                 <Card.Header
                   as="h3"
                   className={`${customDark === "dark-dark"
-                      ? `${customDark} text-white`
-                      : `${customDark} text-white`
+                    ? `${customDark} text-white`
+                    : `${customDark} text-white`
                     }`}
                 >
                   <Row className="d-flex align-items-center">
@@ -906,26 +918,33 @@ const ProcessTable = () => {
       </Row>
 
       {processName !== "Dispatch" && (
-        
-          <Row className="mb-2">
-            <div className="d-flex align-items-center justify-content-between">
-          
-          <Col lg={2} md={4} className="Progressbarcolor">
-            <CatchProgressBar data={combinedTableData} />
-          </Col>
-          
-          <Col lg={10} md={8} className="mr-2">
-            <div>
-              <ProcessProgressTrain
-                ProjectID={selectedProject.value}
-                lotNumber={selectedLot}
-                previousProcess={previousProcess}
-              />
-            </div>
-          </Col>
-        </div> 
+
+        <Row className="mb-2">
+          <div className="d-flex align-items-center justify-content-between">
+
+            <Col lg={2} md={4} className="Progressbarcolor">
+              <CatchProgressBar data={combinedTableData} />
+            </Col>
+
+            <Col lg={10} md={8} className="mr-2">
+              <div>
+                <ProcessProgressTrain
+                  ProjectID={selectedProject.value}
+                  lotNumber={selectedLot}
+                  previousProcess={previousProcess}
+                  showProcessTrain={showProcessTrain}
+                  setShowProcessTrain={setShowProcessTrain}
+                  processTrainData={processTrainData}
+                  setProcessTrainData={setProcessTrainData}
+                  setSelectedStatus={setSelectedStatus}
+                  setSelectedProcessId={setSelectedProcessId}
+                  setModalVisible={setModalVisible}
+                />
+              </div>
+            </Col>
+          </div>
         </Row>
-        
+
       )}
 
       {/* <Row>
@@ -963,24 +982,40 @@ const ProcessTable = () => {
           projectName={projectName}
         />
       ) : (
-        <Row className="mb-2 mt-1">
-          <Col lg={12} md={12} className="">
-            {tableData?.length > 0 && (
-              <ProjectDetailsTable
-                tableData={combinedTableData}
-                fetchTransactions={fetchTransactions}
-                setTableData={setTableData}
-                projectId={selectedProject?.value || id}
-                lotNo={selectedLot}
-                featureData={featureData}
-                hasFeaturePermission={hasFeaturePermission}
-                processId={processId}
-                projectLots={projectLots}
-                handleLotClick={handleLotClick}
+        <>
+          {modalVisible ? (
+            <div className="">
+              <ProcessTrainModals
+                ProjectID={selectedProject?.value || id}
+                lotNumber={selectedLot}
+                ProcessID={selectedProcessId}
+                status={selectedStatus}
+                setModalVisible={setModalVisible}
               />
-            )}
-          </Col>
-        </Row>
+            </div>
+          ) : (
+            <Row className="mb-2 mt-1">
+              <Col lg={12} md={12} className="">
+                {tableData?.length > 0 && (
+                  <ProjectDetailsTable
+                    tableData={combinedTableData}
+                    fetchTransactions={fetchTransactions}
+                    setTableData={setTableData}
+                    projectId={selectedProject?.value || id}
+                    lotNo={selectedLot}
+                    featureData={featureData}
+                    hasFeaturePermission={hasFeaturePermission}
+                    processId={processId}
+                    projectLots={projectLots}
+                    handleLotClick={handleLotClick}
+                  />
+                )}
+              </Col>
+            </Row>
+          )}
+
+
+        </>
       )}
 
       <Row className="mb-4 d-flex justify-content-between">

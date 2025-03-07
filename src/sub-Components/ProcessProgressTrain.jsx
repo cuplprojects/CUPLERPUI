@@ -5,16 +5,19 @@ import useCurrentProcessStore from "../store/currentProcessStore";
 import { Popover } from "antd";
 
 const TooltipSection = ({ title, children }) => (
-  <Popover placement="bottom" content={title} trigger="click">
+  <Popover placement="bottom" content={title} trigger="hover">
     <div className="trsection" style={{ cursor: 'pointer' }}>{children}</div>
   </Popover>
 );
 
-const ProcessProgressTrain = ({ ProjectID, lotNumber, previousProcess }) => {
+const ProcessProgressTrain = ({ ProjectID, lotNumber, previousProcess, showProcessTrain, setShowProcessTrain, processTrainData, setProcessTrainData, setSelectedStatus, setSelectedProcessId, setModalVisible }) => {
   const [visibleSections, setVisibleSections] = useState(2);
   const [sectionsData, setsectionsData] = useState([]);
   const { processId, processName } = useCurrentProcessStore();
   const [isDispatched, setIsDispatched] = useState(false);
+  // const [modalVisible, setModalVisible] = useState(false);
+  // const [selectedStatus, setSelectedStatus] = useState(null);
+  // const [selectedProcessId, setSelectedProcessId] = useState(null);
 
   console.log(ProjectID, lotNumber);
   useEffect(() => {
@@ -69,6 +72,18 @@ const ProcessProgressTrain = ({ ProjectID, lotNumber, previousProcess }) => {
 
   const handleCollapse = () => {
     setVisibleSections(2);
+  };
+
+  const handleStatusClick = (status, processId) => {
+    setModalVisible(true);
+    setSelectedStatus(status);
+    setSelectedProcessId(processId);
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    setSelectedStatus(null);
+    setSelectedProcessId(null);
   };
 
   // Find the previous process data in sectionsData
@@ -126,18 +141,24 @@ const ProcessProgressTrain = ({ ProjectID, lotNumber, previousProcess }) => {
                       .join(" ")}
                   </div>
                   <div className="box3">
-                  <TooltipSection title="Pending">
-                  {previousProcessData.remainingCatchNo}/
-                  {previousProcessData.remainingQuantity}
-                </TooltipSection>
-                <TooltipSection title="Started">
-                  {previousProcessData.wipCount}/
-                  {previousProcessData.wipTotalQuantity}
-                </TooltipSection>
-                <TooltipSection title="Completed">
-                  {previousProcessData.completedCount}/
-                  {previousProcessData.completedTotalQuantity}
-                </TooltipSection>
+                    <div onClick={() => handleStatusClick('Pending', previousProcessData.processId)} style={{ cursor: 'pointer' }}>
+                      <TooltipSection title="Pending">
+                        {previousProcessData.remainingCatchNo}/
+                        {previousProcessData.remainingQuantity}
+                      </TooltipSection>
+                    </div>
+                    <div onClick={() => handleStatusClick('WIP', previousProcessData.processId)} style={{ cursor: 'pointer' }}>
+                      <TooltipSection title="WIP">
+                        {previousProcessData.wipCount}/
+                        {previousProcessData.wipTotalQuantity}
+                      </TooltipSection>
+                    </div>
+                    <div onClick={() => handleStatusClick('Completed', previousProcessData.processId)} style={{ cursor: 'pointer' }}>
+                      <TooltipSection title="Completed">
+                        {previousProcessData.completedCount}/
+                        {previousProcessData.completedTotalQuantity}
+                      </TooltipSection>
+                    </div>
                   </div>
                 </div>
               )}
@@ -151,18 +172,24 @@ const ProcessProgressTrain = ({ ProjectID, lotNumber, previousProcess }) => {
                     : "No Current Process"}
                 </div>
                 <div className="box3">
-                <TooltipSection title="Pending">
-                {currentProcessData?.remainingCatchNo}/
-                {currentProcessData?.remainingQuantity}
-              </TooltipSection>
-              <TooltipSection title="Started">
-                {currentProcessData?.wipCount}/
-                {currentProcessData?.wipTotalQuantity}
-              </TooltipSection>
-              <TooltipSection title="Completed">
-                {currentProcessData?.completedCount}/
-                {currentProcessData?.completedTotalQuantity}
-              </TooltipSection>
+                <div onClick={() => handleStatusClick('Pending', currentProcessData?.processId)} style={{ cursor: 'pointer' }}>
+                  <TooltipSection title="Pending">
+                    {currentProcessData?.remainingCatchNo}/
+                    {currentProcessData?.remainingQuantity}
+                  </TooltipSection>
+                </div>
+                <div onClick={() => handleStatusClick('WIP', currentProcessData?.processId)} style={{ cursor: 'pointer' }}>
+                  <TooltipSection title="WIP">
+                    {currentProcessData?.wipCount}/
+                    {currentProcessData?.wipTotalQuantity}
+                  </TooltipSection>
+                </div>
+                <div onClick={() => handleStatusClick('Completed', currentProcessData?.processId)} style={{ cursor: 'pointer' }}>
+                  <TooltipSection title="Completed">
+                    {currentProcessData?.completedCount}/
+                    {currentProcessData?.completedTotalQuantity}
+                  </TooltipSection>
+                </div>
                 </div>
               </div>
             </>
@@ -173,15 +200,21 @@ const ProcessProgressTrain = ({ ProjectID, lotNumber, previousProcess }) => {
                   {section.processName.split(" ").slice(0, 2).join(" ")}
                 </div>
                 <div className="box3">
-                <TooltipSection title="Pending">
-                {section.remainingCatchNo}/{section.remainingQuantity}
-              </TooltipSection>
-              <TooltipSection title="Started">
-                {section?.wipCount}/{section?.wipTotalQuantity}
-              </TooltipSection>
-              <TooltipSection title="Completed">
-                {section.completedCount}/{section?.completedTotalQuantity}
-              </TooltipSection>
+                <div onClick={() => handleStatusClick('Pending', section.processId)} style={{ cursor: 'pointer' }}>
+                  <TooltipSection title="Pending">
+                    {section.remainingCatchNo}/{section.remainingQuantity}
+                  </TooltipSection>
+                </div>
+                <div onClick={() => handleStatusClick('WIP', section.processId)} style={{ cursor: 'pointer' }}>
+                  <TooltipSection title="WIP">
+                    {section?.wipCount}/{section?.wipTotalQuantity}
+                  </TooltipSection>
+                </div>
+                <div onClick={() => handleStatusClick('Completed', section.processId)} style={{ cursor: 'pointer' }}>
+                  <TooltipSection title="Completed">
+                    {section.completedCount}/{section?.completedTotalQuantity}
+                  </TooltipSection>
+                </div>
                 </div>
               </div>
             ))
@@ -198,6 +231,14 @@ const ProcessProgressTrain = ({ ProjectID, lotNumber, previousProcess }) => {
           )}
         </>
       )}
+      {/* <ProcessTrainModals
+        ProjectID={ProjectID}
+        lotNumber={lotNumber}
+        ProcessID={selectedProcessId}
+        status={selectedStatus}
+        visible={modalVisible}
+        onClose={handleModalClose}
+      /> */}
     </div>
   );
 };
