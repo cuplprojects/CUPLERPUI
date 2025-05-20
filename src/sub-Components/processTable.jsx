@@ -28,8 +28,9 @@ import ProcessProgressTrain from "./ProcessProgressTrain";
 import ProcessTrainModals from "./ProcessTrainModals ";
 
 const ProcessTable = () => {
-  const { encryptedProjectId } = useParams();
+  const { encryptedProjectId, encryptedLotNumber } = useParams();
   const id = decrypt(encryptedProjectId);
+  const lotNum = decrypt(encryptedLotNumber);
   const [featureData, setFeatureData] = useState(null);
   const { processId, processName } = useCurrentProcessStore();
   const { setProcess } = useCurrentProcessStore((state) => state.actions);
@@ -72,8 +73,7 @@ const ProcessTable = () => {
   const [showBarChart, setShowBarChart] = useState(false);
   const [catchDetailModalShow, setCatchDetailModalShow] = useState(false);
   const [catchDetailModalData, setCatchDetailModalData] = useState(null);
-  const [selectedLot, setSelectedLot] = useState(
-    localStorage.getItem('selectedLot') );
+  const [selectedLot, setSelectedLot] = useState(lotNum);
   const [projectName, setProjectName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [projectLots, setProjectLots] = useState([]);
@@ -281,9 +281,9 @@ const ProcessTable = () => {
     fetchDigitalOrOffsetData();
   }, [selectedProject, previousProcess, id]);
 
-  const setLotInLocal = (lt) => {
-    localStorage.setItem("selectedLot", lt)
-  }
+  // const setLotInLocal = (lt) => {
+  //   localStorage.setItem("selectedLot", lt)
+  // }
 
   const handleProjectChange = async (selectedProject) => {
     if (!selectedProject || selectedProject.value === id) return;
@@ -338,7 +338,6 @@ const ProcessTable = () => {
           setProjectLots(uniqueLots.map((lotNo) => ({ lotNo })));
           if (uniqueLots.length > 0) {
             setSelectedLot(uniqueLots[0]);
-            setLotInLocal(uniqueLots[0])
           }
         }
         if (firstProcess.sequence > 1) {
@@ -744,7 +743,6 @@ const ProcessTable = () => {
   const handleLotClick = async (lot) => {
     if (lot !== selectedLot) {
       setSelectedLot(lot);
-      setLotInLocal(lot)
       setIsLoading(true);
       try {
         const response = await getProjectTransactionsData(

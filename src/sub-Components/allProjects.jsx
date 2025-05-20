@@ -174,12 +174,10 @@ const AllProjects = () => {
   };
 
   const handleTitleClick = (project) => {
-    setLotInLocal(project.lotNumber)
-    navigate(`/project-details/${encrypt(projectId)}`, { state: { project, projectId } });
+
+    navigate(`/project-details/${encrypt(projectId)}/${encrypt(project.lotNumber)}`, { state: { project, projectId } });
   };
-  const setLotInLocal = (lt) => {
-    localStorage.setItem("selectedLot", lt)
-  }
+
   
 
   const handleBarClick = (elements) => {
