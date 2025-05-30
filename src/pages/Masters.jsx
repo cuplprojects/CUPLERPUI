@@ -30,7 +30,7 @@ import { hasPermission } from '../CustomHooks/Services/permissionUtils';
 import { useTranslation } from 'react-i18next';
 import SecurityQuestions from './SecurityQuestions';
 import Teams from './team';
-import DisplayPanel from './Panel/Panel'
+
 
 const Sidebar = () => {
   const { t } = useTranslation();
@@ -90,7 +90,6 @@ const Sidebar = () => {
     { key: 'zone', icon: <BiSolidCctv />, label: t('zone'), permission: '2.5' },
     { key: 'teams', icon: <RiTeamFill />, label: t('teams'), permission: '2.9' },
     { key: 'alarm', icon: <FaBell />, label: t('alarm'), permission: '2.8' },
-    {key: "display-panel",icon: <FaBell />,label: t("displayPanel"),permission: "2.12", },
     {
       key: 'developerTools',
       icon: <FaScrewdriverWrench />,
@@ -183,7 +182,6 @@ const Sidebar = () => {
           {hasPermission('2.10') && selectedMenu === 'systemSettings' && <SystemSettings />}
           {hasPermission('2.7') && selectedMenu === 'machine' && <Machine />}
           {hasPermission('2.8') && selectedMenu === 'alarm' && <AlarmMaster />}
-          {hasPermission("2.12") && selectedMenu === "display-panel" && (<DisplayPanel />)}
 
         </Col>
       </Row>

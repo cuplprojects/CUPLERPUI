@@ -563,7 +563,7 @@ console.log(tableData)
           dataIndex: "examDate",
           align: "center",
           key: "examDate",
-          sorter: (a, b) => a.examDate - b.examDate,
+          sorter: (a, b) => new Date(a.examDate) - new Date(b.examDate),
           render: (text) => formatDate(text), // Apply formatDate here
         },
       ]
