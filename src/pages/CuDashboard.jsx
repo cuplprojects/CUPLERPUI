@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import LineChart from "./../sub-Components/LineChart";
 import BarChart from "./../sub-Components/BarChart";
-import { Card, Col,Row,Carousel,Container,OverlayTrigger,Tooltip,Dropdown,Spinner} from "react-bootstrap";
+import { Card, Col, Row, Carousel, Container, OverlayTrigger, Tooltip, Dropdown, Spinner, Button } from "react-bootstrap";
 import CuDetailedAgGrid from "../sub-Components/CuDetailedAgGrid";
 import PieChart from "../sub-Components/PieChart";
 import Cards from "../sub-Components/Cards";
@@ -11,6 +11,7 @@ import {
   IoMdArrowDropleftCircle,
 } from "react-icons/io";
 import { PiDotsNineBold } from "react-icons/pi";
+import { MdExpandMore } from "react-icons/md";
 import { useStore } from "zustand";
 import themeStore from "./../store/themeStore";
 import statisticsImage from "./../assets/images/statistics.png";
@@ -49,13 +50,13 @@ const ScrollableContainer = styled.div`
     &::-webkit-scrollbar {
       display: none;
     }
-    
+
     .d-flex {
       scroll-behavior: smooth;
       -webkit-overflow-scrolling: touch;
       scroll-snap-type: x mandatory;
       padding: 8px 0;
-      
+
       > div {
         scroll-snap-align: start;
       }
@@ -78,12 +79,11 @@ const CuDashboard = () => {
     return savedState
       ? JSON.parse(savedState)
       : {
-        // lineChart: true,
-        // pieChart: true,
         agGrid: true,
         barChart: true,
       };
   });
+
   const [visiblecardsIcon] = useState({
     lineChart: LineChartIcon,
     pieChart: PieChartIcon,
@@ -96,7 +96,11 @@ const CuDashboard = () => {
     projects: true,
     quantitySheet: true
   });
+  const [page, setPage] = useState(1);
+  const pageSize = 5; // Number of projects per page
+  const [hasMore, setHasMore] = useState(true);
 
+  // funtion to handle the disabled projects
   const hasDisable = (projectid) => {
     const hasQuantitySheet = hasquantitySheet.find(
       (item) => item.projectId === projectid
@@ -104,98 +108,89 @@ const CuDashboard = () => {
     return hasQuantitySheet ? hasQuantitySheet.quantitySheet : false;
   };
 
-  const generateQueryString = (projectIds) => {
-    return projectIds.map(id => `projectIds=${id}`).join('&');
+  useEffect(() => {
+    fetchProjects(1); // Load initial set of projects
+    fetchHasQuantitySheet();
+  }, [userData.userId]);
+
+  const fetchProjects = async (pageNumber) => {
+    setIsLoading(true);
+    try {
+      // Get starred project ID from localStorage
+      const storedProject = JSON.parse(localStorage.getItem("selectedProject"));
+      const starredProjectId = storedProject?.value;
+
+      // Build API URL with optional starred project parameter
+      let apiUrl = `/Transactions/all-project-completion-percentages?userId=${userData.userId}&page=${pageNumber}&pageSize=${pageSize}`;
+      if (starredProjectId && pageNumber === 1) {
+        apiUrl += `&starredProjectId=${starredProjectId}`;
+      }
+
+      // Fetch project completion percentages and quantity sheets in parallel
+      const response = await API.get(apiUrl);
+
+
+      // Merge project data with completion percentages and mark starred projects
+      const mergedData = response.data.map((project) => {
+        const percentage = response.data.find(
+          (p) => p.projectId === project.projectId
+        );
+        return {
+          ...project,
+          completionPercentage: percentage ? percentage.completionPercentage : 0,
+          remainingPercentage: percentage ? 100 - percentage.completionPercentage : 100,
+          isrecent: starredProjectId && project.projectId === starredProjectId, // Mark starred project
+        };
+      });
+
+      let finalData = [...mergedData];
+
+      // Separate projects with and without quantity sheets
+      const projectsWithQtySheet = finalData.filter((project) => hasDisable(project.projectId));
+      const projectsWithoutQtySheet = finalData.filter((project) => !hasDisable(project.projectId));
+
+      // Combine the two arrays, keeping projects without quantity sheets at the end
+      finalData = [...projectsWithQtySheet, ...projectsWithoutQtySheet];
+
+      setData((prevData) => {
+        if (pageNumber === 1) {
+          // For first page, replace all data (includes starred project if any)
+          return finalData;
+        } else {
+          // For subsequent pages, append new data avoiding duplicates
+          const existingProjectIds = new Set(prevData.map(p => p.projectId));
+          const newProjects = finalData.filter(p => !existingProjectIds.has(p.projectId));
+          return [...prevData, ...newProjects];
+        }
+      });
+      setPage(pageNumber);
+
+      // Set hasMore based on whether we received a full page of results
+      setHasMore(finalData.length === pageSize);
+
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  useEffect(() => {
-    const fetchPercentages = async () => {
-      setIsLoading(prev => ({ ...prev, projects: true }));
-      try {
-        // get percentage
-        //const projectCompletionPercentages = await getAllProjectCompletionPercentages();
-        // get project
-        const projectData = await API.get(
-          `/Project/GetDistinctProjectsForUser/${userData.userId}`
-        );
-        const projectIds = projectData.data.map(project => project.projectId); // Extract project IDs
-        // Convert the projectIds array into a query string like ?projectIds=7&projectIds=9&projectIds=11
-        const queryString = generateQueryString(projectIds);
 
-        // Fetch the completion percentages for the specific projects with the correct query string
-        const projectCompletionPercentages = await API.get(`/Transactions/all-project-completion-percentages?${queryString}`);
-        console.log(projectCompletionPercentages)
-        // Check if the response is an array before using .find()
-
-        const mergedData = projectData.data.map((project) => {
-          const percentage = projectCompletionPercentages.data.find(
-            (p) => p.projectId === project.projectId
-          );
-          return {
-            ...project,
-            completionPercentage: percentage
-              ? percentage.completionPercentage
-              : 0,
-            remainingPercentage: percentage
-              ? 100 - percentage.completionPercentage
-              : 100,
-            isrecent: false, // Add the is recent field and set it to false by default
-          };
-        }); // Filter out projects with 100% completion
-
-        // Check if the selected project exists in the data
-        const selectedProject = JSON.parse(localStorage.getItem("selectedProject"));
-        if (selectedProject) {
-          const selectedProjectIndex = mergedData.findIndex(
-            (project) => project.projectId === selectedProject.value
-          );
-          if (selectedProjectIndex !== -1) {
-            const [selectedProjectData] = mergedData.splice(selectedProjectIndex, 1);
-            selectedProjectData.isrecent = true; // Set isrecent to true for the selected project
-            mergedData.unshift(selectedProjectData);
-          }
-        }
-
-        // Separate projects with and without quantity sheets
-        const projectsWithQtySheet = mergedData.filter(project => hasDisable(project.projectId));
-        const projectsWithoutQtySheet = mergedData.filter(project => !hasDisable(project.projectId));
-
-        // Combine the two arrays, keeping projects without quantity sheets at the end
-        const finalData = [...projectsWithQtySheet, ...projectsWithoutQtySheet];
-
-        setData(finalData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-      finally {
-
-        setIsLoading(prev => ({ ...prev, projects: false }))
-      }
-    };
-    fetchPercentages();
-  }, [userData.userId, hasquantitySheet]);
-
-  useEffect(() => {
-    const fetchHasQuantitySheet = async () => {
-      setIsLoading(prev => ({ ...prev, quantitySheet: true }));
-      try {
-        const projectData = await API.get(
-          `/Project/GetDistinctProjectsForUser/${userData.userId}`
-        );
-        const projectIds = projectData.data.map(project => project.projectId); // Extract project IDs
-        const queryString = generateQueryString(projectIds); // Use the function to generate the query string
+  const fetchHasQuantitySheet = async () => {
+    setIsLoading(true);
+    try {
+      const response = await API.get(
+        `/QuantitySheet/check-all-quantity-sheets?userId=${userData.userId}`
+      );
+      setHasquantitySheet(response.data);
+    } catch (error) {
+      console.error("Error fetching quantity sheet data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
-        const quantitySheetResponse = await API.get(`/QuantitySheet/check-all-quantity-sheets?${queryString}`);
-        setHasquantitySheet(quantitySheetResponse.data); // Store the result from quantity sheet API
-      } catch (error) {
-        console.error("Error fetching quantity sheet data:", error);
-      } finally {
-        setIsLoading(prev => ({ ...prev, quantitySheet: false }));
-      }
-    };
-    fetchHasQuantitySheet();
-  }, []);
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -284,18 +279,32 @@ const CuDashboard = () => {
     const activeCards = Object.values(visibleCards).filter(Boolean).length;
     if (activeCards === 0) {
       return (
-        <Row className="g-4">
-          {data.map((item) => (
-            <Col key={item.projectId} xs={12} sm={12} md={6} lg={3}>
-              <Cards
-                item={item}
-                onclick={onclick}
-                disableProject={hasDisable(item.projectId)}
-                activeCardStyle={activeCard === item.projectId}
+        <>
+          <Row className="g-4">
+            {data.map((item) => (
+              <Col key={item.projectId} xs={12} sm={12} md={6} lg={3}>
+                <Cards
+                  item={item}
+                  onclick={onclick}
+                  disableProject={hasDisable(item.projectId)}
+                  activeCardStyle={activeCard === item.projectId}
+                />
+              </Col>
+            ))}
+          </Row>
+          {hasMore && (
+            <div className="text-center mt-3">
+              <MdExpandMore
+                onClick={() => fetchProjects(page + 1)}
+                style={{
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '3rem',
+                }}
+                className={`${isLoading ? 'opacity-50' : ''} ${customDark} ${customLightText} rounded-5`}
               />
-            </Col>
-          ))}
-        </Row>
+            </div>
+          )}
+        </>
       );
     }
 
@@ -331,63 +340,93 @@ const CuDashboard = () => {
       }
 
       return (
-        <div className="position-relative mb-4">
-          <div className="d-none d-lg-block">
-            <div
-              className={`position-absolute top-50 start-0 translate-middle-y rounded-circle ${customDark}`}
-              style={{ zIndex: 9, left: "10px", cursor: "pointer" }}
-              onClick={() => handleCarouselControl("prev")}
-            >
-              <IoMdArrowDropleftCircle
-                size={40}
-                className={`${customBtn} rounded-circle custom-zoom-btn ${customLightBorder}`}
-              />
+        <>
+          <div className="position-relative mb-4">
+            <div className="d-none d-lg-block">
+              <div
+                className={`position-absolute top-50 start-0 translate-middle-y rounded-circle ${customDark}`}
+                style={{ zIndex: 9, left: "10px", cursor: "pointer" }}
+                onClick={() => handleCarouselControl("prev")}
+              >
+                <IoMdArrowDropleftCircle
+                  size={40}
+                  className={`${customBtn} rounded-circle custom-zoom-btn ${customLightBorder}`}
+                />
+              </div>
+              <div
+                className={`position-absolute top-50 end-0 translate-middle-y rounded-circle ${customDark}`}
+                style={{ zIndex: 9, right: "10px", cursor: "pointer" }}
+                onClick={() => handleCarouselControl("next")}
+              >
+                <IoMdArrowDroprightCircle
+                  size={40}
+                  className={`${customBtn} rounded-circle custom-zoom-btn ${customLightBorder}`}
+                />
+              </div>
             </div>
-            <div
-              className={`position-absolute top-50 end-0 translate-middle-y rounded-circle ${customDark}`}
-              style={{ zIndex: 9, right: "10px", cursor: "pointer" }}
-              onClick={() => handleCarouselControl("next")}
+            <Carousel
+              ref={carouselRef}
+              interval={null}
+              indicators={false}
+              controls={false}
+              touch={true}
+              slide={true}
             >
-              <IoMdArrowDroprightCircle
-                size={40}
-                className={`${customBtn} rounded-circle custom-zoom-btn ${customLightBorder}`}
-              />
-            </div>
+              {carouselItems}
+            </Carousel>
           </div>
-          <Carousel
-            ref={carouselRef}
-            interval={null}
-            indicators={false}
-            controls={false}
-            touch={true}
-            slide={true}
-          >
-            {carouselItems}
-          </Carousel>
-        </div>
+          {hasMore && (
+            <div className="text-center mt-3">
+              <Button
+                onClick={() => fetchProjects(page + 1)}
+                disabled={isLoading}
+                className={`${isLoading ? 'opacity-50' : ''} ${customDark} ${customLightText} rounded-5 border-0 d-flex `}
+              >
+                {isLoading ? (
+                  <Spinner size="sm" />
+                ) : (
+                  <MdExpandMore size={20} />
+                )}
+              </Button>
+            </div>
+          )}
+        </>
       );
     }
 
     // For medium and small screens, use scrollable container
     return (
-      <ScrollableContainer className="scrollable-container mb-4" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        <div className="d-flex flex-nowrap px-2" style={{ gap: '8px' }}>
-          {data.map((item) => (
-            <div key={item.projectId} style={{ 
-              flex: '0 0 auto', 
-              minWidth: window.innerWidth < 768 ? '280px' : '343px',
-              transition: 'min-width 0.3s ease'
-            }}>
-              <Cards
-                item={item}
-                onclick={onclick}
-                disableProject={hasDisable(item.projectId)}
-                activeCardStyle={activeCard === item.projectId}
-              />
-            </div>
-          ))}
-        </div>
-      </ScrollableContainer>
+      <>
+        <ScrollableContainer className="scrollable-container mb-4" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="d-flex flex-nowrap px-2" style={{ gap: '8px' }}>
+            {data.map((item) => (
+              <div key={item.projectId} style={{
+                flex: '0 0 auto',
+                minWidth: window.innerWidth < 768 ? '280px' : '343px',
+                transition: 'min-width 0.3s ease'
+              }}>
+                <Cards
+                  item={item}
+                  onclick={onclick}
+                  disableProject={hasDisable(item.projectId)}
+                  activeCardStyle={activeCard === item.projectId}
+                />
+              </div>
+            ))}
+          </div>
+        </ScrollableContainer>
+        {hasMore && (
+          <div className="text-center mt-3">
+            <Button
+              onClick={() => fetchProjects(page + 1)}
+              disabled={isLoading}
+              variant="primary"
+            >
+              {isLoading ? t("loading") : t("showMore")}
+            </Button>
+          </div>
+        )}
+      </>
     );
   };
 

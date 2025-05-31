@@ -12,6 +12,7 @@ import themeStore from "../store/themeStore";
 import { useStore } from "zustand";
 
 const Cards = ({ item, onclick, disableProject, activeCardStyle }) => {
+  // console.log(item)
   const navigate = useNavigate();
   const { userData } = useUserDataStore();
   const role = userData?.role;
@@ -49,6 +50,7 @@ const Cards = ({ item, onclick, disableProject, activeCardStyle }) => {
     }
   };
 
+  // API call for fetching project process
   const fetchProjectProcess = async () => {
     try {
       const response = await API.get(
@@ -82,9 +84,11 @@ const Cards = ({ item, onclick, disableProject, activeCardStyle }) => {
       }
     }
   };
-    //  const setLotInLocal = (lt) => {
-    //     localStorage.setItem("selectedLot", lt)
-    //   }
+
+  //  const setLotInLocal = (lt) => {
+  //     localStorage.setItem("selectedLot", lt)
+  //   }
+
   // Navigate to the dashboard and send projectId as a route parameter
   const handleCardClick = () => {
     if (!disableProject) {
@@ -95,12 +99,12 @@ const Cards = ({ item, onclick, disableProject, activeCardStyle }) => {
       return;
     }
 
-      navigate(`/dashboard/${encrypt(item.projectId)}`);
-   
+    navigate(`/dashboard/${encrypt(item.projectId)}`);
+
     // Store selected project in local storage
     const selectedProject = {
       value: item.projectId,
-      label: item.name,
+      label: item.projectName,
       seriesInfo: ""
     };
     localStorage.setItem("selectedProject", JSON.stringify(selectedProject));
@@ -146,7 +150,8 @@ const Cards = ({ item, onclick, disableProject, activeCardStyle }) => {
             </div>
           )}
           <div className="header">
-            <h4 className="project-name">{item.name}</h4>
+            <h4 className="project-name">{item.projectName}</h4>
+            {console.log(item.projectName)}
             <Tooltip
               title={
                 isUploadDisabled
