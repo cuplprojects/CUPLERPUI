@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Form, Button, Row, Col, Container, Spinner, Dropdown } from "react-bootstrap";
-import { FaFileExport, FaSearch, FaFilter, FaSave, FaSortUp, FaSortDown, FaList } from 'react-icons/fa';
+import {
+    FaFileExport, FaSearch, FaFilter, FaSave, FaSortUp, FaSortDown, FaList,
+    FaUndo, FaObjectGroup, FaBoxes, FaCalendarAlt, FaTable, FaListOl, FaChartBar,
+    FaChartPie, FaUserTie, FaClock, FaCogs, FaIndustry, FaChevronDown, FaChevronRight
+} from 'react-icons/fa';
+import { FaAnglesLeft, FaAnglesRight } from "react-icons/fa6";
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import API from "../../CustomHooks/MasterApiHooks/api";
 import Table from 'react-bootstrap/Table';
@@ -8,8 +13,8 @@ import ExcelExport from './Excel';
 import PdfExport from './Pdf';
 import { AiFillCloseSquare } from "react-icons/ai";
 import ProcessDetails from './Process';
-import { FaUndo } from 'react-icons/fa';
-import { FaAnglesLeft, FaAnglesRight } from "react-icons/fa6";
+import DailyReport from "./Dailyreport";
+
 
 const ProjectReport = () => {
     const [activeProjects, setActiveProjects] = useState([]);
@@ -41,11 +46,12 @@ const ProjectReport = () => {
         quantity: true,
         pages: true,
         status: true,
+        startTime: true,
+        endTime: true,
+        duration: true,
         currentProcess: true,
         innerEnvelope: true,
         outerEnvelope: true,
-        dispatchDate: false,
-
     });
 
     const [sortField, setSortField] = useState(null);
@@ -58,16 +64,223 @@ const ProjectReport = () => {
     const [currentSearchPage, setCurrentSearchPage] = useState(1);
     const [hasMoreResults, setHasMoreResults] = useState(false);
 
+    const [showDailyReport, setShowDailyReport] = useState(false);
+    const [selectedReportType, setSelectedReportType] = useState('Detailed Report');
+
+    // Define CSS animations
+    const keyframes = `
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideInUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+    `;
+
+    // Add the keyframes to the document and card hover effects
+    React.useEffect(() => {
+        // Add keyframes and z-index styles
+        const styleElement = document.createElement('style');
+        styleElement.innerHTML = `
+            ${keyframes}
+
+            /* Ensure dropdowns appear above all other elements */
+            .position-absolute.bg-white.rounded.shadow-lg {
+                z-index: 99999 !important;
+            }
+
+            /* Ensure cards have a lower z-index */
+            .card {
+                z-index: 1;
+            }
+        `;
+        document.head.appendChild(styleElement);
+
+        // Add hover effects to cards
+        const addCardHoverEffects = () => {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', () => {
+                    card.style.transform = 'translateY(-5px)';
+                    card.style.boxShadow = '0 10px 20px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06)';
+                });
+
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = 'translateY(0)';
+                    card.style.boxShadow = '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)';
+                });
+            });
+        };
+
+        // Add the hover effects after a short delay to ensure the DOM is ready
+        const timer = setTimeout(() => {
+            addCardHoverEffects();
+        }, 500);
+
+        return () => {
+            document.head.removeChild(styleElement);
+            clearTimeout(timer);
+        };
+    }, [keyframes]);
+
+    // Define global styles for the component
+    const styles = {
+        pageContainer: {
+            background: 'linear-gradient(to bottom, #f8f9fa, #ffffff)',
+            minHeight: '100vh',
+            padding: '25px 20px',
+            transition: 'all 0.3s ease',
+            position: 'relative'
+        },
+        reportContainer: {
+            animation: 'slideInUp 0.5s ease-in-out',
+            borderRadius: '8px',
+            overflow: 'hidden'
+        },
+        pageHeader: {
+            marginBottom: '25px',
+            borderBottom: '1px solid rgba(0,0,0,0.05)',
+            paddingBottom: '15px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+        },
+        pageTitle: {
+            display: 'flex',
+            alignItems: 'center',
+            fontSize: '1.75rem',
+            fontWeight: '600',
+            color: '#2c3e50',
+            margin: '0'
+        },
+        pageTitleIcon: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #4a90e2, #5e72e4)',
+            color: 'white',
+            marginRight: '12px',
+            boxShadow: '0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08)'
+        },
+        sectionTitle: {
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            marginBottom: '15px',
+            color: '#2c3e50',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            textAlign: 'center'
+        },
+        sectionIcon: {
+            marginRight: '8px',
+            color: '#4a90e2'
+        },
+        card: {
+            borderRadius: '12px',
+            border: '1px solid rgba(0,0,0,0.05)',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+            overflow: 'hidden',
+            height: '100%',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            zIndex: 1 /* Ensure cards have a lower z-index than dropdowns */
+        },
+        formLabel: {
+            fontSize: '0.9rem',
+            fontWeight: '500',
+            color: '#495057',
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '8px'
+        },
+        formControl: {
+            backgroundColor: "#ffffff",
+            border: '1px solid #e0e0e0',
+            borderRadius: '8px',
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.03)",
+            height: "42px",
+            fontSize: "0.9rem",
+            padding: '10px 12px',
+            width: '100%'
+        },
+        button: {
+            transition: "all 0.3s ease",
+            boxShadow: "0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08)",
+            fontWeight: '500',
+            fontSize: '0.9rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        },
+        table: {
+            borderCollapse: 'separate',
+            borderSpacing: '0',
+            width: '100%',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+            border: '1px solid rgba(0,0,0,0.05)'
+        },
+        tableHeader: {
+            backgroundColor: '#f8f9fa',
+            color: '#495057',
+            fontWeight: '600',
+            fontSize: '0.9rem',
+            padding: '12px 15px',
+            textAlign: 'left',
+            borderBottom: '2px solid #e9ecef'
+        },
+        tableCell: {
+            padding: '12px 15px',
+            fontSize: '0.9rem',
+            borderBottom: '1px solid #e9ecef',
+            color: '#495057'
+        },
+        filterSection: {
+            background: 'white',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '25px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+            border: '1px solid rgba(0,0,0,0.05)',
+            animation: 'slideInUp 0.5s ease-in-out 0.1s both',
+            position: 'relative',
+            zIndex: 1 /* Ensure filter section has a lower z-index than dropdowns */
+        }
+    };
+
     const columnDefinitions = [
         { id: 'catchNo', label: 'Catch No' },
         { id: 'subject', label: 'Subject' },
-        { id: 'paper', label: 'Paper' },
         { id: 'course', label: 'Course' },
+        { id: 'paper', label: 'Paper' },
         { id: 'examDate', label: 'Exam Date' },
         { id: 'examTime', label: 'Exam Time' },
         { id: 'quantity', label: 'Quantity' },
         { id: 'pages', label: 'Pages' },
         { id: 'status', label: 'Status' },
+        { id: 'startTime', label: 'SD-ST' },
+        { id: 'endTime', label: 'ED-ET' },
+        { id: 'duration', label: 'Duration' },
         { id: 'currentProcess', label: 'Current Process' },
         { id: 'innerEnvelope', label: 'Inner Envelope' },
         { id: 'outerEnvelope', label: 'Outer Envelope' },
@@ -178,11 +391,40 @@ const ProjectReport = () => {
         if (selectedProjectId) {
             setIsLoading(true);
             try {
+                // First get the project details to get the series name
+                const projectResponse = await API.get(`/Project/${selectedProjectId}`);
+                const projectDetails = projectResponse.data;
+
+                // Then get the quantity sheets
                 const response = await API.get(`/Reports/GetQuantitySheetsByProjectId/${selectedProjectId}/LotNo/${selectedLot}`);
                 const filteredSheets = selectedLot
                     ? response.data.filter((sheet) => sheet.lotNo === selectedLot)
                     : response.data;
-                setQuantitySheets(filteredSheets);
+
+                // Group by catchNo and sum quantities
+                const groupedSheets = filteredSheets.reduce((acc, sheet) => {
+                    const existing = acc.find(item => item.catchNo === sheet.catchNo);
+                    if (existing) {
+                        existing.quantity += sheet.quantity; // Sum the quantity
+                    } else {
+                        acc.push({ ...sheet }); // Add new entry
+                    }
+                    return acc;
+                }, []);
+
+                // Add series name to each sheet with the correct series letter if series exists
+                const sheetsWithSeries = groupedSheets.map((sheet, index) => {
+                    const catchNo = sheet.catchNo;
+
+                    // Check if project has series name and number of series
+                    // Removed series name logic
+                    return {
+                        ...sheet,
+                        // seriesName: `${seriesLetter}` // Removed this line
+                    };
+                });
+
+                setQuantitySheets(sheetsWithSeries);
                 setShowTable(true);
             } catch (error) {
                 console.error("Error fetching quantity sheets:", error);
@@ -256,7 +498,7 @@ const ProjectReport = () => {
 
         try {
             const response = await API.get(`/Reports/GetQuantitySheetsByCatchNo/${value.projectId}/${value.catchNo}`);
-            console.log(response.data);
+            // console.log(response.data);
             setShowDropdown(false);
             setSelectedItem(response.data[0]);
         } catch (error) {
@@ -321,6 +563,7 @@ const ProjectReport = () => {
                     aValue = a.dispatchDate;
                     bValue = b.dispatchDate;
                     break;
+
                 default:
                     aValue = a[field];
                     bValue = b[field];
@@ -349,525 +592,1046 @@ const ProjectReport = () => {
     };
 
     const handleResetAll = () => {
-        {
-            // Reset all state variables
-            setSelectedGroup('');
-            setSelectedProjectId('');
-            setSelectedLot('');
-            setQuantitySheets([]);
-            setFilteredSheets([]);
-            setSearchTerm('');
-            setCurrentPage(0);
-            setRecordsPerPage(10);
-            setSortField('');
-            setSortDirection('asc');
-            setSearchResults([]);
-            setVisibleColumns({
-                catchNo: true,
-                subject: true,
-                course: true,
-                paper: true,
-                examDate: true,
-                examTime: true,
-                quantity: true,
-                pages: true,
-                status: true,
-                innerEnvelope: true,
-                outerEnvelope: true,
-                dispatchDate: true
-            });
-        }
+        // Reset all state variables
+        setSelectedReportType('Detailed Report');
+        setShowDailyReport(false);
+        setSelectedGroup('');
+        setSelectedProjectId('');
+        setSelectedLot('');
+        setQuantitySheets([]);
+        setFilteredSheets([]);
+        setSearchTerm('');
+        setCurrentPage(0);
+        setRecordsPerPage(10);
+        setSortField('');
+        setSortDirection('asc');
+        setSearchResults([]);
+        setSelectedItem(null);
+        setSelectedCatch(null);
+        setShowCatchView(false);
+        setShowTable(false);
+        setVisibleColumns({
+            catchNo: true,
+            subject: true,
+            course: true,
+            paper: true,
+            examDate: true,
+            examTime: true,
+            quantity: true,
+            pages: true,
+            status: true,
+            innerEnvelope: true,
+            outerEnvelope: true,
+            dispatchDate: true,
+        });
     };
 
     return (
-        <Container fluid className="py-1"
-        >
-            <Row  >
+        <Container fluid style={styles.pageContainer}>
+            <div style={styles.reportContainer}>
+                {/* Page Title and Header */}
+                <div style={styles.pageHeader}>
+                    <div style={{width: '150px'}}> {/* Left side controls if needed */}
+                    </div>
+                    <h2 style={{...styles.pageTitle, justifyContent: 'center', textAlign: 'center'}}>
+                        <span style={styles.pageTitleIcon}>
+                            <FaChartBar />
+                        </span>
+                        Report
+                    </h2>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', width: '250px', justifyContent: 'flex-end'}}>
+                        <Dropdown>
+                            
+                            <Dropdown.Toggle
+                                variant="outline-primary"
+                                id="report-type-dropdown"
+                                style={{
+                                    backgroundColor: '#f0f7ff',
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                                    border: '1px solid #4a90e2',
+                                    fontSize: '0.85rem',
+                                    fontWeight: '500',
+                                    color: '#4a90e2',
+                                    minWidth: '150px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}
+                            >
+                                {selectedReportType}
+                                
+                            </Dropdown.Toggle>
 
-                <div className="text-center position-relative">
-                    <h4 className="mt-0" style={{
-                        fontSize: "2rem",
-                        fontWeight: "600",
-                        color: "#2c3e50",
-                        letterSpacing: "1px",
-                        textShadow: "2px 2px 4px rgba(0,0,0,0.1)",
-                    }}>
-                        Reports
-                    </h4>
-                    <div className="position-absolute top-0 end-0">
+                            <Dropdown.Menu style={{
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                border: '1px solid rgba(0,0,0,0.05)',
+                                padding: '8px',
+                                minWidth: '200px'
+                            }}>
+                                
+                                <Dropdown.Item
+                                    onClick={() => {
+                                        setSelectedReportType('Detailed Report');
+                                        setShowDailyReport(false);
+                                        // Reset all state variables when switching report types
+                                        setSelectedGroup('');
+                                        setSelectedProjectId('');
+                                        setSelectedLot('');
+                                        setQuantitySheets([]);
+                                        setFilteredSheets([]);
+                                        setSearchTerm('');
+                                        setCurrentPage(0);
+                                        setRecordsPerPage(10);
+                                        setSortField('');
+                                        setSortDirection('asc');
+                                        setSearchResults([]);
+                                        setSelectedItem(null);
+                                        setSelectedCatch(null);
+                                        setShowCatchView(false);
+                                        setShowTable(false);
+                                        setVisibleColumns({
+                                            catchNo: true,
+                                            subject: true,
+                                            course: true,
+                                            paper: true,
+                                            examDate: true,
+                                            examTime: true,
+                                            quantity: true,
+                                            pages: true,
+                                            status: true,
+                                            innerEnvelope: true,
+                                            outerEnvelope: true,
+                                            dispatchDate: true,
+                                        });
+                                    }}
+                                    style={{
+                                        borderRadius: '4px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: selectedReportType === 'Detailed Report' ? '600' : '500',
+                                        backgroundColor: selectedReportType === 'Detailed Report' ? '#e8f4fd' : 'transparent',
+                                        color: selectedReportType === 'Detailed Report' ? '#4a90e2' : '#495057'
+                                    }}
+                                >
+                                    Detailed Report
+                                </Dropdown.Item>
+                                <Dropdown.Item
+                                    onClick={() => {
+                                        setSelectedReportType('Daily Report');
+                                        setShowDailyReport(true);
+                                        // Reset all state variables when switching to Daily Report
+                                        setSelectedGroup('');
+                                        setSelectedProjectId('');
+                                        setSelectedLot('');
+                                        setQuantitySheets([]);
+                                        setFilteredSheets([]);
+                                        setSearchTerm('');
+                                        setCurrentPage(0);
+                                        setRecordsPerPage(10);
+                                        setSortField('');
+                                        setSortDirection('asc');
+                                        setSearchResults([]);
+                                        setSelectedItem(null);
+                                        setSelectedCatch(null);
+                                        setShowCatchView(false);
+                                        setShowTable(false);
+                                        setVisibleColumns({
+                                            catchNo: true,
+                                            subject: true,
+                                            course: true,
+                                            paper: true,
+                                            examDate: true,
+                                            examTime: true,
+                                            quantity: true,
+                                            pages: true,
+                                            status: true,
+                                            innerEnvelope: true,
+                                            outerEnvelope: true,
+                                            dispatchDate: true,
+                                        });
+                                    }}
+                                    style={{
+                                        borderRadius: '4px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: selectedReportType === 'Daily Report' ? '600' : '500',
+                                        backgroundColor: selectedReportType === 'Daily Report' ? '#e8f4fd' : 'transparent',
+                                        color: selectedReportType === 'Daily Report' ? '#4a90e2' : '#495057'
+                                    }}
+                                >
+                                    Daily Report
+                                </Dropdown.Item>
+                                <Dropdown.Item
+                                    onClick={() => {
+                                        setSelectedReportType('Date Range Report');
+                                        setShowDailyReport(false);
+                                        // Reset all state variables when switching report types
+                                        setSelectedGroup('');
+                                        setSelectedProjectId('');
+                                        setSelectedLot('');
+                                        setQuantitySheets([]);
+                                        setFilteredSheets([]);
+                                        setSearchTerm('');
+                                        setCurrentPage(0);
+                                        setRecordsPerPage(10);
+                                        setSortField('');
+                                        setSortDirection('asc');
+                                        setSearchResults([]);
+                                        setSelectedItem(null);
+                                        setSelectedCatch(null);
+                                        setShowCatchView(false);
+                                        setShowTable(false);
+                                        setVisibleColumns({
+                                            catchNo: true,
+                                            subject: true,
+                                            course: true,
+                                            paper: true,
+                                            examDate: true,
+                                            examTime: true,
+                                            quantity: true,
+                                            pages: true,
+                                            status: true,
+                                            innerEnvelope: true,
+                                            outerEnvelope: true,
+                                            dispatchDate: true,
+                                        });
+                                    }}
+                                    style={{
+                                        borderRadius: '4px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: selectedReportType === 'Date Range Report' ? '600' : '500',
+                                        backgroundColor: selectedReportType === 'Date Range Report' ? '#e8f4fd' : 'transparent',
+                                        color: selectedReportType === 'Date Range Report' ? '#4a90e2' : '#495057'
+                                    }}
+                                >
+                                    Date Range Report
+                                </Dropdown.Item>
+                                <Dropdown.Item
+                                    onClick={() => {
+                                        setSelectedReportType('User Wise Report');
+                                        setShowDailyReport(false);
+                                        // Reset all state variables when switching report types
+                                        setSelectedGroup('');
+                                        setSelectedProjectId('');
+                                        setSelectedLot('');
+                                        setQuantitySheets([]);
+                                        setFilteredSheets([]);
+                                        setSearchTerm('');
+                                        setCurrentPage(0);
+                                        setRecordsPerPage(10);
+                                        setSortField('');
+                                        setSortDirection('asc');
+                                        setSearchResults([]);
+                                        setSelectedItem(null);
+                                        setSelectedCatch(null);
+                                        setShowCatchView(false);
+                                        setShowTable(false);
+                                        setVisibleColumns({
+                                            catchNo: true,
+                                            subject: true,
+                                            course: true,
+                                            paper: true,
+                                            examDate: true,
+                                            examTime: true,
+                                            quantity: true,
+                                            pages: true,
+                                            status: true,
+                                            innerEnvelope: true,
+                                            outerEnvelope: true,
+                                            dispatchDate: true,
+                                        });
+                                    }}
+                                    style={{
+                                        borderRadius: '4px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: selectedReportType === 'User Wise Report' ? '600' : '500',
+                                        backgroundColor: selectedReportType === 'User Wise Report' ? '#e8f4fd' : 'transparent',
+                                        color: selectedReportType === 'User Wise Report' ? '#4a90e2' : '#495057'
+                                    }}
+                                >
+                                    User Wise Report
+                                </Dropdown.Item>
+                                <Dropdown.Item
+                                    onClick={() => {
+                                        setSelectedReportType('Process Report');
+                                        setShowDailyReport(false);
+                                        // Reset all state variables when switching report types
+                                        setSelectedGroup('');
+                                        setSelectedProjectId('');
+                                        setSelectedLot('');
+                                        setQuantitySheets([]);
+                                        setFilteredSheets([]);
+                                        setSearchTerm('');
+                                        setCurrentPage(0);
+                                        setRecordsPerPage(10);
+                                        setSortField('');
+                                        setSortDirection('asc');
+                                        setSearchResults([]);
+                                        setSelectedItem(null);
+                                        setSelectedCatch(null);
+                                        setShowCatchView(false);
+                                        setShowTable(false);
+                                        setVisibleColumns({
+                                            catchNo: true,
+                                            subject: true,
+                                            course: true,
+                                            paper: true,
+                                            examDate: true,
+                                            examTime: true,
+                                            quantity: true,
+                                            pages: true,
+                                            status: true,
+                                            innerEnvelope: true,
+                                            outerEnvelope: true,
+                                            dispatchDate: true,
+                                        });
+                                    }}
+                                    style={{
+                                        borderRadius: '4px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: selectedReportType === 'Process Report' ? '600' : '500',
+                                        backgroundColor: selectedReportType === 'Process Report' ? '#e8f4fd' : 'transparent',
+                                        color: selectedReportType === 'Process Report' ? '#4a90e2' : '#495057'
+                                    }}
+                                >
+                                    Process Report
+                                </Dropdown.Item>
+                                <Dropdown.Item
+                                    onClick={() => {
+                                        setSelectedReportType('Machine Report');
+                                        setShowDailyReport(false);
+                                        // Reset all state variables when switching report types
+                                        setSelectedGroup('');
+                                        setSelectedProjectId('');
+                                        setSelectedLot('');
+                                        setQuantitySheets([]);
+                                        setFilteredSheets([]);
+                                        setSearchTerm('');
+                                        setCurrentPage(0);
+                                        setRecordsPerPage(10);
+                                        setSortField('');
+                                        setSortDirection('asc');
+                                        setSearchResults([]);
+                                        setSelectedItem(null);
+                                        setSelectedCatch(null);
+                                        setShowCatchView(false);
+                                        setShowTable(false);
+                                        setVisibleColumns({
+                                            catchNo: true,
+                                            subject: true,
+                                            course: true,
+                                            paper: true,
+                                            examDate: true,
+                                            examTime: true,
+                                            quantity: true,
+                                            pages: true,
+                                            status: true,
+                                            innerEnvelope: true,
+                                            outerEnvelope: true,
+                                            dispatchDate: true,
+                                        });
+                                    }}
+                                    style={{
+                                        borderRadius: '4px',
+                                        fontSize: '0.85rem',
+                                        fontWeight: selectedReportType === 'Machine Report' ? '600' : '500',
+                                        backgroundColor: selectedReportType === 'Machine Report' ? '#e8f4fd' : 'transparent',
+                                        color: selectedReportType === 'Machine Report' ? '#4a90e2' : '#495057'
+                                    }}
+                                >
+                                   Machine Report
+                                </Dropdown.Item>
+                            </Dropdown.Menu>
+                        </Dropdown>
                         <Button
-                            variant="outline-secondary"
-                            className="rounded px-4 py-2 btn-sm"
+                            variant="outline-primary"
+                            className="rounded"
                             onClick={handleResetAll}
                             style={{
-                                transition: 'all 0.2s ease',
-                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                ...styles.button,
+                                padding: '4px 12px',
+                                backgroundColor: '#f0f7ff',
+                                border: '1px solid #4a90e2',
+                                fontSize: '0.85rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                fontWeight: '500',
+                                color: '#4a90e2',
+                                minWidth: '80px',
+                                justifyContent: 'center'
                             }}
                         >
-                            <FaUndo className="me-2" />
-                            Reset All
+                            <FaUndo className="me-1" style={{fontSize: '0.75rem'}} />
+                            Reset
                         </Button>
                     </div>
                 </div>
-                <hr />
 
-                {/* Filters */}
-                <div className="d-flex align-items-center justify-content-between">
-                    {/* Group Dropdown */}
-                    <Col xs={12} md={2} lg={1} className="mb-3 mb-md-0">
-                        <Form.Label className="fw-bold text-primary mb-2" style={{ fontSize: "1.1rem", letterSpacing: "0.5px", fontWeight: "700" }}>
-                            <span style={{ color: '#2c3e50', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Group</span>
-                            <span style={{ color: '#e74c3c' }}>*</span>
-                        </Form.Label>
-                        <Form.Select
-                            onChange={(e) => {
-                                setSelectedGroup(e.target.value);
-                                setSelectedProjectId('');
-                                setQuantitySheets([]);
-                            }}
-                            value={selectedGroup}
-                            className="form-select-lg border-0 rounded"
-                            style={{
-                                backgroundColor: "#f8f9fa",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                                fontSize: "0.9rem"
-                            }}
-                        >
-                            <option value="">Select Group</option>
-                            {Object.entries(groups).map(([id, name]) => (
-                                <option key={id} value={id}>{name}</option>
-                            ))}
-                        </Form.Select>
-                    </Col>
+                {selectedReportType === 'Daily Report' ? (
+                    <DailyReport />
+                ) : selectedReportType === 'Detailed Report' ? (
+                    <>
+                        {/* Filters Section */}
+                        <div style={styles.filterSection}>
 
-                    {/* Project Dropdown */}
-                    <Col xs={12} md={4} lg={2} className="mb-3 mb-md-0">
-                        <Form.Label className="fw-bold text-primary mb-2" style={{ fontSize: "1.1rem", letterSpacing: "0.5px", fontWeight: "700" }}>
-                            <span style={{ color: '#2c3e50', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Project</span>
-                            <span style={{ color: '#e74c3c' }}>*</span>
-                        </Form.Label>
-                        <Form.Select
-                            onChange={(e) => {
-                                setSelectedProjectId(e.target.value);
-                                setSelectedLot("");
-                                setQuantitySheets([]);
-                            }}
-                            value={selectedProjectId}
-                            className="form-select-lg border-0 rounded"
-                            style={{
-                                backgroundColor: "#f8f9fa",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                                fontSize: "0.9rem"
-                            }}
-                        >
-                            <option value="">Select Project</option>
-                            {console.log(activeProjects)}
-                            {activeProjects.map((project, index) => (
-                                <option key={index} value={project.projectId}>{project.name}</option>
-                            ))}
-                        </Form.Select>
-                    </Col>
+                            <Row className="g-3">
+                                {/* Group Dropdown */}
+                                <Col xs={12} md={6} lg={3}>
+                                    <div style={{ marginBottom: '15px' }}>
+                                        <div style={styles.formLabel}>
+                                            <FaObjectGroup style={{ marginRight: '8px', color: '#4a90e2' }} />
+                                            Group <span style={{ color: '#e74c3c', marginLeft: '3px' }}>*</span>
+                                        </div>
+                                        <Form.Select
+                                            onChange={(e) => {
+                                                setSelectedGroup(e.target.value);
+                                                setSelectedProjectId('');
+                                                setQuantitySheets([]);
+                                            }}
+                                            value={selectedGroup}
+                                            style={styles.formControl}
+                                        >
+                                            <option value="">Select Group</option>
+                                            {Object.entries(groups).map(([id, name]) => (
+                                                <option key={id} value={id}>{name}</option>
+                                            ))}
+                                        </Form.Select>
+                                    </div>
+                                </Col>
 
-                    {/* Lot Dropdown */}
-                    <Col xs={12} md={2} lg={1} className="mb-3 mb-md-0">
-                        <Form.Label className="fw-bold text-primary mb-2" style={{ fontSize: "1.1rem", letterSpacing: "0.5px", fontWeight: "700" }}>
-                            <span style={{ color: '#2c3e50', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Lot</span>
-                            <span style={{ color: '#e74c3c' }}>*</span>
-                        </Form.Label>
-                        <Form.Select
-                            onChange={(e) => {
-                                setSelectedLot(e.target.value);
-                                setQuantitySheets([]);
-                            }}
-                            value={selectedLot}
-                            disabled={!selectedProjectId}
-                            className="form-select-lg border-0 rounded"
-                            style={{
-                                backgroundColor: "#f8f9fa",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                                opacity: selectedProjectId ? 1 : 0.7,
-                                fontSize: "0.9rem"
-                            }}
-                        >
-                            <option value="">Select Lot</option>
-                            {lotNumbers.map((lotNo) => (
-                                <option key={lotNo} value={lotNo}>{lotNo}</option>
-                            ))}
-                        </Form.Select>
-                    </Col>
+                                {/* Project Dropdown */}
+                                <Col xs={12} md={6} lg={3}>
+                                    <div style={{ marginBottom: '15px' }}>
+                                        <div style={styles.formLabel}>
+                                            <FaList style={{ marginRight: '8px', color: '#4a90e2' }} />
+                                            Project <span style={{ color: '#e74c3c', marginLeft: '3px' }}>*</span>
+                                        </div>
+                                        <Form.Select
+                                            onChange={(e) => {
+                                                setSelectedProjectId(e.target.value);
+                                                setSelectedLot("");
+                                                setQuantitySheets([]);
+                                            }}
+                                            value={selectedProjectId}
+                                            style={styles.formControl}
+                                        >
+                                            <option value="">Select Project</option>
+                                            {activeProjects.map((project, index) => (
+                                                <option key={index} value={project.projectId}>{project.name}</option>
+                                            ))}
+                                        </Form.Select>
+                                    </div>
+                                </Col>
 
-                    {/* DispatchDate Button */}
-                    <Col xs={12} md={2} lg={1} className="mt-4 mb-md-0">
-                        {showTable && quantitySheets.length > 0 && (
-                            <Form.Label className="fw-bold text-primary mb-2" style={{ fontSize: "0.9rem", letterSpacing: "0.5px", fontWeight: "700", whiteSpace: "nowrap" }}>
-                                <span style={{ color: '#2c3e50', textShadow: '1px 1px 2px rgba(0,0,0,0.1)' }}>Dispatch Date: {quantitySheets[0]?.dispatchDate || 'N/A'}</span>
-                            </Form.Label>
-                        )}
-                    </Col>
+                                {/* Lot Dropdown */}
+                                <Col xs={12} md={6} lg={2}>
+                                    <div style={{ marginBottom: '15px' }}>
+                                        <div style={styles.formLabel}>
+                                            <FaBoxes style={{ marginRight: '8px', color: '#4a90e2' }} />
+                                            Lot <span style={{ color: '#e74c3c', marginLeft: '3px' }}>*</span>
+                                        </div>
+                                        <Form.Select
+                                            onChange={(e) => {
+                                                setSelectedLot(e.target.value);
+                                                setQuantitySheets([]);
+                                            }}
+                                            value={selectedLot}
+                                            disabled={!selectedProjectId}
+                                            style={{
+                                                ...styles.formControl,
+                                                opacity: selectedProjectId ? 1 : 0.7
+                                            }}
+                                        >
+                                            <option value="">Select Lot</option>
+                                            {lotNumbers.map((lotNo) => (
+                                                <option key={lotNo} value={lotNo}>{lotNo}</option>
+                                            ))}
+                                        </Form.Select>
+                                    </div>
+                                </Col>
 
-                    {/* View Report Button */}
-                    <Col xs={12} md={3} lg={2} className="mt-4 mb-md-0 d-flex align-items-end justify-content-center">
-                        {selectedGroup && selectedProjectId && selectedLot && (
-                            <Button
-                                variant="primary"
-                                onClick={handleViewReport}
-                                disabled={isLoading}
-                                className="w-40 rounded fw-bold text-center d-flex align-items-center justify-content-center"
-                                style={{
-                                    transition: "all 0.3s ease",
-                                    boxShadow: "0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08)",
-                                    opacity: isLoading ? 0.7 : 1,
-                                    transform: isLoading ? "none" : "translateY(-1px)", 
-                                    fontSize: "0.9rem",
-                                    height: "30px"
-                                }}
-                            >
-                                View Report
-                            </Button>
-                        )}
-                    </Col>
+                                {/* View Report Button and Dispatch Date in the same column */}
+                                <Col xs={12} md={6} lg={4} className="d-flex align-items-end">
+                                    <div style={{ marginBottom: '15px', width: '100%' }}>
+                                        <div className="d-flex align-items-center">
+                                            {selectedGroup && selectedProjectId && selectedLot && (
+                                                <Button
+                                                    variant="primary"
+                                                    onClick={handleViewReport}
+                                                    disabled={isLoading}
+                                                    style={{
+                                                        ...styles.button,
+                                                        padding: '10px 15px',
+                                                        opacity: isLoading ? 0.7 : 1,
+                                                        transform: isLoading ? "none" : "translateY(-1px)",
+                                                        marginRight: '10px'
+                                                    }}
+                                                >
+                                                    <FaSearch className="me-2" />
+                                                    View Report
+                                                </Button>
+                                            )}
 
-                    {/* Search Dropdown */}
-                    <Col xs={12} md={2} lg={1} className="mb-3 mb-md-0">
-                        <div className="d-flex justify-content-end mt-4">
-                            <div className="position-relative">
-                                <Form.Control
-                                    type="text"
-                                    placeholder="Quick search ..."
-                                    fontSize="0.9rem"
-                                    value={searchTerm}
-                                    onChange={(e) => {
-                                        setSearchTerm(e.target.value);
-                                        setCurrentSearchPage(1); // Reset page when search term changes
-                                        handleSearch(e.target.value, 1);
-                                    }}
-                                    className="form-control-lg border-0 rounded"
-                                    style={{
-                                        backgroundColor: "#f8f9fa",
-                                        padding: "10px 20px 10px 40px",
-                                        boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                                        width: "210px",
-                                        height: "30px",
-                                        fontSize: "0.9rem"
-                                    }}
-                                />
-                                <FaSearch
-                                    style={{
-                                        position: "absolute",
-                                        left: "15px",
-                                        top: "50%",
-                                        transform: "translateY(-50%)",
-                                        color: "#4A90E2"
-                                    }}
-                                />
-
-                                {searchTerm.length > 0 && (
-                                    <div
-                                        className="position-absolute w-100 bg-white rounded shadow-lg mt-1"
-                                        style={{
-                                            maxHeight: "300px",
-                                            overflowY: "auto",
-                                            zIndex: 1000
-                                        }}
-                                    >
-                                        {isSearching && currentSearchPage === 1 ? (
-                                            <div className="text-center py-3">
-                                                <Spinner animation="border" size="sm" variant="primary" />
-                                                <div className="text-muted mt-2">Searching...</div>
-                                            </div>
-                                        ) : searchResults.length > 0 ? (
-                                            <>
-                                                <div className="search-results">
-                                                    {searchResults.map((result, index) => (
-                                                        <div
-                                                            key={index}
-                                                            className="p-3 border-bottom hover-bg-light"
-                                                            onClick={() => SearchCatchClick(result)}
-                                                            style={{ cursor: "pointer" }}
-                                                        >
-                                                            <div className="fw-bold text-primary">Catch No: {result.catchNo}</div>
-                                                            <div className="fw-bold text-primary">
-                                                                {result.matchedColumn}: {result.matchedValue}
-                                                            </div>
-                                                            <div className="fw-bold text-primary">Project Name: {result.projectName}</div>
-                                                            <div className="fw-bold text-primary">Lot No: {result.lotNo}</div>
-                                                        </div>
-                                                    ))}
+                                            {showTable && quantitySheets.length > 0 && (
+                                                <div style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    padding: '8px 12px',
+                                                    borderRadius: '8px',
+                                                    backgroundColor: '#e8f4fd',
+                                                    color: '#2c7be5',
+                                                    fontWeight: '500',
+                                                    fontSize: '0.9rem',
+                                                    boxShadow: '0 2px 4px rgba(44, 123, 229, 0.1)',
+                                                    border: '1px solid rgba(44, 123, 229, 0.2)',
+                                                    animation: 'fadeIn 0.3s ease-in-out',
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    <FaCalendarAlt style={{ marginRight: '8px' }} />
+                                                    Dispatch: {quantitySheets[0]?.dispatchDate || 'N/A'}
                                                 </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </Col>
 
-                                                {hasMoreResults && (
-                                                    <div
-                                                        className="text-center py-2 border-top"
-                                                        style={{ backgroundColor: '#f8f9fa' }}
-                                                    >
-                                                        <button
-                                                            className="btn btn-link text-primary"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleShowMore();
-                                                            }}
-                                                            disabled={isSearching}
-                                                        >
-                                                            {isSearching ? (
-                                                                <>
-                                                                    <Spinner
-                                                                        animation="border"
-                                                                        size="sm"
-                                                                        className="me-2"
-                                                                    />
-                                                                    Loading...
-                                                                </>
-                                                            ) : (
-                                                                'Show More'
-                                                            )}
-                                                        </button>
+                                {/* Search Box */}
+                                <Col xs={12} md={6} lg={3} className="d-flex align-items-end" style={{ position: 'static' }}>
+                                    <div className="position-relative" style={{
+                                        width: '100%',
+                                        marginBottom: '15px',
+                                        position: 'relative', /* Ensure proper positioning context */
+                                        zIndex: 1000 /* Add z-index to parent container */
+                                    }}>
+                                        <Form.Control
+                                            type="text"
+                                            placeholder="Quick search..."
+                                            value={searchTerm}
+                                            onChange={(e) => {
+                                                setSearchTerm(e.target.value);
+                                                setCurrentSearchPage(1);
+                                                handleSearch(e.target.value, 1);
+                                            }}
+                                            style={{
+                                                ...styles.formControl,
+                                                paddingLeft: '40px'
+                                            }}
+                                        />
+                                        <FaSearch
+                                            style={{
+                                                position: "absolute",
+                                                left: "15px",
+                                                top: "50%",
+                                                transform: "translateY(-50%)",
+                                                color: "#4A90E2"
+                                            }}
+                                        />
+
+                                        {searchTerm.length > 0 && (
+                                            <div
+                                                className="position-absolute w-100 bg-white rounded shadow-lg"
+                                                style={{
+                                                    maxHeight: "300px",
+                                                    overflowY: "auto",
+                                                    zIndex: 99999, /* Significantly increased z-index to ensure dropdown appears above all elements */
+                                                    border: '1px solid rgba(0,0,0,0.1)',
+                                                    borderRadius: '8px',
+                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                                    position: 'absolute', /* Ensure absolute positioning */
+                                                    bottom: '100%', /* Position above the search input instead of below */
+                                                    marginBottom: '5px', /* Add some space between input and dropdown */
+                                                    left: 0,
+                                                    right: 0
+                                                }}
+                                            >
+                                                {isSearching && currentSearchPage === 1 ? (
+                                                    <div className="text-center py-3">
+                                                        <Spinner animation="border" size="sm" variant="primary" />
+                                                        <div style={{ color: '#6c757d', fontSize: '0.9rem', marginTop: '8px' }}>Searching...</div>
+                                                    </div>
+                                                ) : searchResults.length > 0 ? (
+                                                    <>
+                                                        <div className="search-results">
+                                                            {searchResults.map((result, index) => (
+                                                                <div
+                                                                    key={index}
+                                                                    className="p-3 border-bottom"
+                                                                    onClick={() => SearchCatchClick(result)}
+                                                                    style={{
+                                                                        cursor: "pointer",
+                                                                        transition: 'background-color 0.2s ease',
+                                                                        backgroundColor: index % 2 === 0 ? '#f8f9fa' : 'white',
+                                                                        borderLeft: '3px solid transparent',
+                                                                        ':hover': {
+                                                                            backgroundColor: '#e8f4fd',
+                                                                            borderLeftColor: '#4a90e2'
+                                                                        }
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.backgroundColor = '#e8f4fd';
+                                                                        e.currentTarget.style.borderLeft = '3px solid #4a90e2';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#f8f9fa' : 'white';
+                                                                        e.currentTarget.style.borderLeft = '3px solid transparent';
+                                                                    }}
+                                                                >
+                                                                    <div style={{ fontWeight: '600', color: '#4a90e2', fontSize: '0.9rem', marginBottom: '3px' }}>Catch No: {result.catchNo}</div>
+                                                                    <div style={{ fontWeight: '500', color: '#495057', fontSize: '0.85rem', marginBottom: '3px' }}>
+                                                                        {result.matchedColumn}: {result.matchedValue}
+                                                                    </div>
+                                                                    <div style={{ fontWeight: '500', color: '#495057', fontSize: '0.85rem', marginBottom: '3px' }}>Project: {result.projectName}</div>
+                                                                    <div style={{ fontWeight: '500', color: '#495057', fontSize: '0.85rem' }}>Lot No: {result.lotNo}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+
+                                                        {hasMoreResults && (
+                                                            <div
+                                                                className="text-center py-2 border-top"
+                                                                style={{ backgroundColor: '#f8f9fa' }}
+                                                            >
+                                                                <button
+                                                                    className="btn btn-link"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleShowMore();
+                                                                    }}
+                                                                    disabled={isSearching}
+                                                                    style={{
+                                                                        color: '#4a90e2',
+                                                                        textDecoration: 'none',
+                                                                        fontWeight: '500',
+                                                                        fontSize: '0.9rem',
+                                                                        padding: '8px 16px',
+                                                                        borderRadius: '4px',
+                                                                        transition: 'background-color 0.2s ease'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.backgroundColor = '#e8f4fd';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                                                    }}
+                                                                >
+                                                                    {isSearching ? (
+                                                                        <>
+                                                                            <Spinner
+                                                                                animation="border"
+                                                                                size="sm"
+                                                                                className="me-2"
+                                                                            />
+                                                                            Loading...
+                                                                        </>
+                                                                    ) : (
+                                                                        'Show More'
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <div className="text-center py-4">
+                                                        <div style={{ color: '#6c757d', fontSize: '0.9rem', marginBottom: '4px' }}>No results found</div>
+                                                        <small style={{ color: '#adb5bd', fontSize: '0.8rem' }}>Try a different search term</small>
                                                     </div>
                                                 )}
-                                            </>
-                                        ) : (
-                                            <div className="text-center py-4">
-                                                <div className="text-muted">No results found</div>
-                                                <small className="text-muted">Try a different search term</small>
-                                            </div>
+                                                </div>
                                         )}
                                     </div>
-                                )}
-                            </div>
+                                </Col>
+                            </Row>
                         </div>
-                    </Col>
-                </div>
 
-                <div className="mb-3 mb-md-0">
-                    {/* Table to display selected data */}
-                    {selectedItem && (
-                        <>
-                            <div className="d-flex justify-content-end align-items-center mb-3 mt-2">
+                        {/* Table Section */}
+                        <div style={{
 
-                                <Dropdown className="d-inline-block">
-                                    <div className="export-btn d-flex justify-content-end">
-                                        <Dropdown.Toggle variant="primary" id="export-dropdown" className="me-2">
-                                            <FaFileExport className="me-2" />
-                                            Export
-                                        </Dropdown.Toggle>
+                        }}>
+                            {/* Table to display selected data */}
+                            {selectedItem && (
+                                <>
+                                    <div className="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 style={styles.sectionTitle}>
+                                            <FaTable style={styles.sectionIcon} />
+                                            Catch Details
+                                        </h5>
+
+                                        <div className="d-flex align-items-center">
+                                            <Dropdown className="d-inline-block">
+                                                <Dropdown.Toggle
+                                                    variant="primary"
+                                                    id="export-dropdown"
+                                                    className="me-3"
+                                                    style={{
+                                                        ...styles.button,
+                                                        padding: '8px 16px',
+                                                        borderRadius: '6px',
+                                                        backgroundColor: '#4a90e2',
+                                                        border: 'none'
+                                                    }}
+                                                >
+                                                    <FaFileExport className="me-2" />
+                                                    Export
+                                                </Dropdown.Toggle>
+
+                                                <Dropdown.Menu style={{
+                                                    borderRadius: '8px',
+                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                                    border: '1px solid rgba(0,0,0,0.05)',
+                                                    padding: '8px'
+                                                }}>
+                                                    <div className="d-flex">
+                                                        <Dropdown.Item
+                                                            as={ExcelExport}
+                                                            data={[selectedItem]}
+                                                            projectName={projectName}
+                                                            groupName={groups[selectedGroup]}
+                                                            lotNo={selectedLot}
+                                                            visibleColumns={{
+                                                                catchNo: true,
+                                                                subject: true,
+                                                                course: true,
+                                                                paper: true,
+                                                                examDate: true,
+                                                                examTime: true,
+                                                                quantity: true,
+                                                                pages: true,
+                                                                status: true,
+                                                                currentProcess: true,
+                                                                innerEnvelope: true,
+                                                                outerEnvelope: true,
+                                                                dispatchDate: true
+                                                            }}
+                                                            className="py-2"
+                                                            style={{
+                                                                borderRadius: '4px',
+                                                                transition: 'background-color 0.2s ease'
+                                                            }}
+                                                        />
+                                                        <div className="vr mx-2"></div>
+
+                                                        <Dropdown.Item
+                                                            as={PdfExport}
+                                                            data={[selectedItem]}
+                                                            projectName={projectName}
+                                                            groupName={groups[selectedGroup]}
+                                                            lotNo={selectedLot}
+                                                            visibleColumns={{
+                                                                catchNo: true,
+                                                                subject: true,
+                                                                course: true,
+                                                                paper: true,
+                                                                examDate: true,
+                                                                examTime: true,
+                                                                quantity: true,
+                                                                pages: true,
+                                                                status: true,
+                                                                currentProcess: true,
+                                                                innerEnvelope: true,
+                                                                outerEnvelope: true,
+                                                                dispatchDate: true
+                                                            }}
+                                                            className="py-2"
+                                                            style={{
+                                                                borderRadius: '4px',
+                                                                transition: 'background-color 0.2s ease'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </Dropdown.Menu>
+                                            </Dropdown>
+
+                                            <button
+                                                className="btn btn-sm btn-outline-danger"
+                                                style={{
+                                                    ...styles.button,
+                                                    padding: '8px 16px',
+                                                    borderRadius: '6px',
+                                                    backgroundColor: 'white',
+                                                    border: '1px solid #dc3545'
+                                                }}
+                                                onClick={() => setSelectedItem(null)}
+                                            >
+                                                <AiFillCloseSquare className="me-2" />
+                                                Close
+                                            </button>
+                                        </div>
                                     </div>
 
-
-                                    <Dropdown.Menu className="mt-1">
-                                        <div className="d-flex">
-                                            <Dropdown.Item
-                                                as={ExcelExport}
-                                                data={[selectedItem]}
-                                                projectName={projectName}
-                                                groupName={groups[selectedGroup]}
-                                                lotNo={selectedLot}
-
-                                                visibleColumns={{
-                                                    catchNo: true,
-                                                    subject: true,
-                                                    course: true,
-                                                    paper: true,
-                                                    examDate: true,
-                                                    examTime: true,
-                                                    quantity: true,
-                                                    pages: true,
-                                                    status: true,
-                                                    currentProcess: true,
-                                                    innerEnvelope: true,
-                                                    outerEnvelope: true,
-                                                    dispatchDate: true
-                                                }}
-                                                className="py-2"
-                                            />
-                                            <div className="vr mx-1"></div>
-
-                                            <Dropdown.Item
-                                                as={PdfExport}
-                                                data={[selectedItem]}
-                                                projectName={projectName}
-                                                groupName={groups[selectedGroup]}
-                                                lotNo={selectedLot}
-
-                                                visibleColumns={{
-                                                    catchNo: true,
-                                                    subject: true,
-                                                    course: true,
-                                                    paper: true,
-                                                    examDate: true,
-                                                    examTime: true,
-                                                    quantity: true,
-                                                    pages: true,
-                                                    status: true,
-                                                    currentProcess: true,
-                                                    innerEnvelope: true,
-                                                    outerEnvelope: true,
-                                                    dispatchDate: true
-                                                }}
-                                                className="py-2"
-                                            />
-                                        </div>
-                                    </Dropdown.Menu>
-                                </Dropdown>
-                            </div>
-                            <div className="position-relative">
-                                <button
-                                    className="p-0 m-0 btn btn-sm btn-outline-secondary position-absolute"
-                                    style={{
-                                        top: '0px',
-                                        right: '10px',
-                                        transition: 'color 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.target.style.color = 'red'}
-                                    onMouseLeave={(e) => e.target.style.color = ''}
-                                    onClick={() => setSelectedItem(null)}
-                                >
-                                    <AiFillCloseSquare size={30} color="red" />
-                                </button>
-                                <Table striped bordered hover>
-                                    <thead>
-                                        <tr>
-                                            <th>Catch No</th>
-                                            <th>Subject</th>
-                                            <th>Course</th>
-                                            <th>Paper</th>
-                                            <th>Exam Date</th>
-                                            <th>Exam Time</th>
-                                            <th>Quantity</th>
-                                            <th>Pages</th>
-                                            <th>Status</th>
-                                            <th>CurrentProcess</th>
-                                            <th>Inner Envelope</th>
-                                            <th>Outer Envelope</th>
-                                            <th>Dispatch</th>
-
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr onClick={() => {
-                                            selectedItem.showProcessDetails = !selectedItem.showProcessDetails;
-                                            setSelectedItem({ ...selectedItem });
-                                        }} style={{ cursor: 'pointer' }}>
-                                            <td>{selectedItem.catchNo}</td>
-                                            <td>{selectedItem.subject}</td>
-                                            <td>{selectedItem.course}</td>
-                                            <td>{selectedItem.paper}</td>
-                                            <td>{new Date(selectedItem.examDate).toLocaleDateString()}</td>
-                                            <td>{selectedItem.examTime}</td>
-                                            <td>{selectedItem.quantity}</td>
-                                            <td>{selectedItem.pages}</td>
-                                            <td><span className={`badge ${selectedItem.catchStatus === 'Completed' ? 'bg-success' :
-                                                selectedItem.catchStatus === 'Running' ? 'bg-primary' :
-                                                    selectedItem.catchStatus === 'Pending' ? 'bg-danger' : 'bg-secondary'
-                                                }`}>
-                                                {selectedItem.catchStatus}
-                                            </span></td>
-
-                                            <td>{selectedItem.currentProcessName}</td>
-                                            <td>{selectedItem.innerEnvelope}</td>
-                                            <td>{selectedItem.outerEnvelope}</td>
-                                            <td>{selectedItem.dispatchDate}</td>
-
-                                        </tr>
-                                        {selectedItem.showProcessDetails && (
-                                            <tr>
-                                                <td colSpan="13">
-                                                    <ProcessDetails
-                                                        catchData={selectedItem}
-                                                        projectName={selectedProjectId}
-                                                        groupName={groups[selectedGroup]}
-                                                    />
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </Table>
-
-                            </div>
-                        </>
-                    )}
-                </div>
-            </Row>
-
+                                    <div style={{
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
+                                        boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+                                        border: '1px solid rgba(0,0,0,0.05)',
+                                        marginBottom: '20px'
+                                    }}>
+                                        <Table striped bordered hover style={{
+                                            margin: 0,
+                                            borderCollapse: 'collapse'
+                                        }}>
+                                            <thead>
+                                                <tr style={{
+                                                    backgroundColor: '#f8f9fa',
+                                                    borderBottom: '2px solid #e9ecef'
+                                                }}>
+                                                    <th style={styles.tableHeader}>Catch No</th>
+                                                    <th style={styles.tableHeader}>Subject</th>
+                                                    <th style={styles.tableHeader}>Course</th>
+                                                    <th style={styles.tableHeader}>Paper</th>
+                                                    <th style={styles.tableHeader}>Exam Date</th>
+                                                    <th style={styles.tableHeader}>Exam Time</th>
+                                                    <th style={styles.tableHeader}>Quantity</th>
+                                                    <th style={styles.tableHeader}>Pages</th>
+                                                    <th style={styles.tableHeader}>Status</th>
+                                                    <th style={styles.tableHeader}>Current Process</th>
+                                                    <th style={styles.tableHeader}>Inner Envelope</th>
+                                                    <th style={styles.tableHeader}>Outer Envelope</th>
+                                                    <th style={styles.tableHeader}>Dispatch</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr
+                                                    onClick={() => {
+                                                        selectedItem.showProcessDetails = !selectedItem.showProcessDetails;
+                                                        setSelectedItem({ ...selectedItem });
+                                                    }}
+                                                    style={{
+                                                        cursor: 'pointer',
+                                                        transition: 'background-color 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.backgroundColor = '#f0f7ff';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.backgroundColor = '';
+                                                    }}
+                                                >
+                                                    <td style={styles.tableCell}>{selectedItem.catchNo}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.subject}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.course}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.paper}</td>
+                                                    <td style={styles.tableCell}>{new Date(selectedItem.examDate).toLocaleDateString()}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.examTime}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.quantity}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.pages}</td>
+                                                    <td style={styles.tableCell}>
+                                                        <span style={{
+                                                            display: 'inline-block',
+                                                            padding: '4px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '0.8rem',
+                                                            fontWeight: '500',
+                                                            color: 'white',
+                                                            backgroundColor:
+                                                                selectedItem.catchStatus === 'Completed' ? '#2dce89' :
+                                                                selectedItem.catchStatus === 'Running' ? '#4a90e2' :
+                                                                selectedItem.catchStatus === 'Pending' ? '#f5365c' : '#6c757d'
+                                                        }}>
+                                                            {selectedItem.catchStatus}
+                                                        </span>
+                                                    </td>
+                                                    <td style={styles.tableCell}>{selectedItem.currentProcessName}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.innerEnvelope}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.outerEnvelope}</td>
+                                                    <td style={styles.tableCell}>{selectedItem.dispatchDate}</td>
+                                                </tr>
+                                                {selectedItem.showProcessDetails && (
+                                                    <tr>
+                                                        <td colSpan="13" style={{
+                                                            padding: '15px',
+                                                            backgroundColor: '#f8f9fa',
+                                                            border: '1px solid #e9ecef'
+                                                        }}>
+                                                            <ProcessDetails
+                                                                catchData={selectedItem}
+                                                                projectName={selectedProjectId}
+                                                                groupName={groups[selectedGroup]}
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </Table>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '12px',
+                        padding: '40px 20px',
+                        textAlign: 'center',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+                        border: '1px solid rgba(0,0,0,0.05)',
+                        animation: 'slideInUp 0.5s ease-in-out'
+                    }}>
+                        <div style={{
+                            fontSize: '3rem',
+                            color: '#4a90e2',
+                            marginBottom: '20px'
+                        }}>
+                            <FaChartBar />
+                        </div>
+                        <h4 style={{
+                            color: '#2c3e50',
+                            marginBottom: '15px',
+                            fontWeight: '600'
+                        }}>
+                            {selectedReportType}
+                        </h4>
+                        <p style={{
+                            color: '#6c757d',
+                            fontSize: '1.1rem',
+                            maxWidth: '400px',
+                            margin: '0 auto'
+                        }}>
+                            This report type is coming soon. Please select "Detailed Report" or "Daily Report" for now.
+                        </p>
+                    </div>
+                )}
+            </div>
 
 
+
+            {/* Loading Spinner */}
             {isLoading && (
-                <div className="text-center mt-4">
-                    <Spinner animation="border" variant="primary" />
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '40px 20px',
+                    backgroundColor: 'white',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    textAlign: 'center',
+                    animation: 'slideInUp 0.5s ease-in-out',
+                    marginBottom: '25px'
+                }}>
+                    <div style={{
+                        width: '60px',
+                        height: '60px',
+                        position: 'relative',
+                        marginBottom: '20px'
+                    }}>
+                        <Spinner
+                            animation="border"
+                            variant="primary"
+                            style={{
+                                width: '60px',
+                                height: '60px',
+                                color: '#4a90e2',
+                                borderWidth: '4px'
+                            }}
+                        />
+                        <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            fontSize: '1.5rem',
+                            color: '#4a90e2',
+                            opacity: 0.5
+                        }}>
+                            <FaChartBar />
+                        </div>
+                    </div>
+                    <h5 style={{
+                        fontSize: '1.2rem',
+                        fontWeight: '600',
+                        marginBottom: '8px',
+                        color: '#2c3e50'
+                    }}>Loading Report Data</h5>
+                    <p style={{
+                        color: '#6c757d',
+                        fontSize: '0.95rem',
+                        maxWidth: '400px',
+                        margin: '0 auto'
+                    }}>Please wait while we fetch the latest information...</p>
                 </div>
             )}
 
+            {/* Pagination Section */}
             {!isLoading && showTable && quantitySheets.length > 0 && (
-                <Row className="">
-                    <Col>
-                        <Row className=" mb-2 mt-3">
-                            {/* <Col xs={12} md={4} lg={3} className="text-end">
-                                <div className="mb-3 d-flex justify-content-between align-items-center">
-                                    <div className="bg-light p-2 rounded shadow-sm">
-                                        <span className="fw-bold text-primary">Total Records: </span>
-                                        <span className="badge bg-danger">{filteredSheets.length}</span>
-                                    </div>
-                                    <div>
-                                        <strong>Show: </strong>
-                                        <select
-                                            className="form-select form-select-sm d-inline-block w-auto ms-2"
-                                            value={recordsPerPage}
-                                            onChange={handleRecordsPerPageChange}
-                                        >
-                                            <option value={5}>5</option>
-                                            <option value={10}>10</option>
-                                            <option value={20}>20</option>
-                                            <option value={50}>50</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </Col> */}
+                <div style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    marginBottom: '25px',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    animation: 'slideInUp 0.5s ease-in-out 0.3s both'
+                }}>
+                    <Row className="align-items-center">
+                        {/* Showing total records */}
+                        <Col xs={12} md={6} lg={3}>
+                            <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '10px 19px',
+                                borderRadius: '8px',
+                                backgroundColor: '#f8f9fa',
+                                color: '#495057',
+                                fontWeight: '500',
+                                fontSize: '0.9rem',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                border: '1px solid rgba(0,0,0,0.05)',
 
-                            {/* Showing total records */}
-                            <Col xs={12} md={4} lg={2}>
-                                <div className="text-muted" style={{
-                                    fontSize: "0.95rem",
-                                    fontWeight: "500",
-                                    padding: "8px 12px",
-                                    backgroundColor: "#f8f9fa",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+                            }}>
+                                <FaTable style={{ marginRight: '8px', color: '#4a90e2' }} />
+                                <span>Showing </span>
+                                <span style={{ fontWeight: '600', color: '#4a90e2', margin: '0 4px' }}>
+                                    {filteredSheets.length > 0 ? currentPage * recordsPerPage + 1 : 0}
+                                </span>
+                                <span> to </span>
+                                <span style={{ fontWeight: '600', color: '#4a90e2', margin: '0 4px' }}>
+                                    {Math.min((currentPage + 1) * recordsPerPage, filteredSheets.length)}
+                                </span>
+                                <span> of </span>
+                                <span style={{ fontWeight: '600', color: '#f5365c', margin: '0 4px' }}>
+                                    {filteredSheets.length}
+                                </span>
+                                <span> Records</span>
+                            </div>
+                        </Col>
+
+                        {/* Limit Rows */}
+                        <Col xs={12} md={6} lg={3}>
+                            <div className="d-flex align-items-center">
+                                <div style={{
+                                    fontWeight: '500',
+                                    color: '#495057',
+                                    fontSize: '0.9rem',
+                                    marginRight: '10px'
                                 }}>
-                                    <span className="text-primary">Showing</span>{" "}
-                                    <span className="fw-bold">
-                                        {filteredSheets.length > 0 ? currentPage * recordsPerPage + 1 : 0}
-                                    </span>{" "}
-                                    <span className="text-primary">to</span>{" "}
-                                    <span className="fw-bold">
-                                        {Math.min((currentPage + 1) * recordsPerPage, filteredSheets.length)}
-                                    </span>{" "}
-                                    <span className="text-primary">of</span>{" "}
-                                    <span className="text-danger">{filteredSheets.length}</span>{" "}
-                                    <span className="text-primary">Records</span>
+                                    <FaListOl style={{ marginRight: '8px', color: '#4a90e2' }} />
+                                    Rows per page:
                                 </div>
-                            </Col>
-                            {/* Limit Rows */}
-                            <Col xs={12} md={4} lg={3}>
-                                <div className=" d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>Limit Rows: </strong>
-                                        <select
-                                            className="form-select form-select-sm d-inline-block w-auto ms-2"
-                                            value={recordsPerPage}
-                                            onChange={handleRecordsPerPageChange}
-                                        >
-                                            <option value={5}>5</option>
-                                            <option value={10}>10</option>
-                                            <option value={20}>20</option>
-                                            <option value={50}>50</option>
-                                        </select>
-                                    </div>
-                                </div>
+                                <select
+                                    className="form-select form-select-sm"
+                                    value={recordsPerPage}
+                                    onChange={handleRecordsPerPageChange}
+                                    style={{
 
-                            </Col>
+                                        borderRadius: '6px',
+                                        border: '1px solid #e0e0e0',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        width: ' 90px',
+                                        fontSize: '0.9rem',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value={5}>5</option>
+                                    <option value={10}>10</option>
+                                    <option value={20}>20</option>
+                                    <option value={50}>50</option>
+                                </select>
+                            </div>
+                        </Col>
 
                             {/* Search and Filters */}
                             <Col xs={12} md={4} lg={3}>
@@ -940,14 +1704,7 @@ const ProjectReport = () => {
                                             <FaFilter style={{ color: '#6c757d', fontSize: '1.5rem', transition: 'transform 0.2s', ':hover': { transform: 'scale(1.1)' } }} />
                                         </Button>
                                         <div className="dropdown-menu p-3" style={{ minWidth: '300px' }}>
-                                            <div className="d-flex justify-content-between mb-3">
-                                                <Button
-                                                    variant="primary"
-                                                    size="sm"
-                                                >
-                                                    <FaSave className="me-1" /> Save
-                                                </Button>
-                                            </div>
+
                                             <div>
                                                 <div className="mb-3">
 
@@ -985,7 +1742,7 @@ const ProjectReport = () => {
 
 
                             {/* Export */}
-                            <Col xs={12} md={4} lg={1} className="text-end">
+                            <Col xs={12} md={4} lg={2} className="text-end">
 
                                 {/* Export */}
                                 <div className="exporttbn">
@@ -1009,7 +1766,7 @@ const ProjectReport = () => {
                                             </Dropdown.Item>
 
                                             <div className="vr mx-1"></div>
-                                            {console.log(quantitySheets)}
+                                            {/* {console.log(quantitySheets)} */}
                                             <Dropdown.Item
                                                 as={PdfExport}
                                                 data={quantitySheets}
@@ -1026,58 +1783,7 @@ const ProjectReport = () => {
                                 </div>
                             </Col>
 
-                            {/* Pagination */}
-                            <Col xs={12} md={4} lg={3}>
-                                <div className="d-flex justify-content-end">
-                                    <ul className="pagination mb-0">
-                                        <li className={`page-item ${currentPage === 0 ? 'disabled' : ''}`}>
-                                            <button
-                                                className="page-link"
-                                                onClick={() => setCurrentPage(p => p - 1)}
-                                                disabled={currentPage === 0}
-                                            >
-                                                <FaAnglesLeft />
-                                            </button>
-                                        </li>
-                                        {[...Array(Math.ceil(filteredSheets.length / recordsPerPage))].map((_, i) => {
-                                            const showPage = i === 0 ||
-                                                i === Math.ceil(filteredSheets.length / recordsPerPage) - 1 ||
-                                                Math.abs(currentPage - i) <= 1;
 
-                                            if (!showPage) {
-                                                if (i === currentPage - 2 || i === currentPage + 2) {
-                                                    return (
-                                                        <li key={i} className="page-item disabled">
-                                                            <span className="page-link">...</span>
-                                                        </li>
-                                                    );
-                                                }
-                                                return null;
-                                            }
-
-                                            return (
-                                                <li key={i} className={`page-item ${currentPage === i ? 'active' : ''}`}>
-                                                    <button
-                                                        className="page-link"
-                                                        onClick={() => setCurrentPage(i)}
-                                                    >
-                                                        {i + 1}
-                                                    </button>
-                                                </li>
-                                            );
-                                        })}
-                                        <li className={`page-item ${currentPage >= Math.ceil(filteredSheets.length / recordsPerPage) - 1 ? 'disabled' : ''}`}>
-                                            <button
-                                                className="page-link"
-                                                onClick={() => setCurrentPage(p => p + 1)}
-                                                disabled={currentPage >= Math.ceil(filteredSheets.length / recordsPerPage) - 1}
-                                            >
-                                                <FaAnglesRight />
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </Col>
 
                         </Row>
                         {!showCatchView ? (
@@ -1090,7 +1796,7 @@ const ProjectReport = () => {
                                                     <div className="d-flex align-items-center justify-content-between">
                                                         <div onClick={() => handleSort('catchNo')} style={{ cursor: 'pointer', textAlign: 'center' }}>
                                                             <div className="d-flex align-items-center justify-content-center">
-                                                                Catch
+                                                                Catch No
                                                                 <div className="d-flex flex-column ms-2" style={{ fontSize: '12px' }}>
                                                                     <FaSortUp
                                                                         color={sortField === 'catchNo' && sortDirection === 'asc' ? '#fff' : '#000'}
@@ -1274,7 +1980,57 @@ const ProjectReport = () => {
                                                     </div>
                                                 </th>
                                             )}
-
+                                            {visibleColumns.startTime && (
+                                                <th onClick={() => handleSort('startTime')} style={{ cursor: 'pointer' }}>
+                                                    <div className="d-flex align-items-center justify-content-center">
+                                                        SD-ST
+                                                        <div className="d-flex flex-column ms-2" style={{ fontSize: '12px' }}>
+                                                            <FaSortUp
+                                                                color={sortField === 'startTime' && sortDirection === 'asc' ? '#fff' : '#000'}
+                                                                style={{ marginBottom: '-3px' }}
+                                                            />
+                                                            <FaSortDown
+                                                                color={sortField === 'startTime' && sortDirection === 'desc' ? '#fff' : '#000'}
+                                                                style={{ marginTop: '-3px' }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </th>
+                                            )}
+                                            {visibleColumns.endTime && (
+                                                <th onClick={() => handleSort('endTime')} style={{ cursor: 'pointer' }}>
+                                                    <div className="d-flex align-items-center justify-content-center">
+                                                        ED-ET
+                                                        <div className="d-flex flex-column ms-2" style={{ fontSize: '12px' }}>
+                                                            <FaSortUp
+                                                                color={sortField === 'endTime' && sortDirection === 'asc' ? '#fff' : '#000'}
+                                                                style={{ marginBottom: '-3px' }}
+                                                            />
+                                                            <FaSortDown
+                                                                color={sortField === 'endTime' && sortDirection === 'desc' ? '#fff' : '#000'}
+                                                                style={{ marginTop: '-3px' }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </th>
+                                            )}
+                                            {visibleColumns.duration && (
+                                                <th onClick={() => handleSort('duration')} style={{ cursor: 'pointer' }}>
+                                                    <div className="d-flex align-items-center justify-content-center">
+                                                        Duration
+                                                        <div className="d-flex flex-column ms-2" style={{ fontSize: '12px' }}>
+                                                            <FaSortUp
+                                                                color={sortField === 'duration' && sortDirection === 'asc' ? '#fff' : '#000'}
+                                                                style={{ marginBottom: '-3px' }}
+                                                            />
+                                                            <FaSortDown
+                                                                color={sortField === 'duration' && sortDirection === 'desc' ? '#fff' : '#000'}
+                                                                style={{ marginTop: '-3px' }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </th>
+                                            )}
                                             {visibleColumns.currentProcess && (
 
 
@@ -1328,7 +2084,8 @@ const ProjectReport = () => {
                                                     </div>
                                                 </th>
                                             )}
-                                            
+
+
 
                                         </tr>
                                     </thead>
@@ -1365,11 +2122,23 @@ const ProjectReport = () => {
                                                             </span>
                                                         </td>
                                                     )}
+                                                    {visibleColumns.startTime && <td className="text-center">{new Date(sheet.startTime).toLocaleString('en-GB', { hour12: true })}</td>}
+                                                    {visibleColumns.endTime && (
+                                                        <td className="text-center">
+                                                            {sheet.catchStatus === 'Running' ? '' : new Date(sheet.endTime).toLocaleString('en-GB', { hour12: true })}
+                                                        </td>
+                                                    )}
+                                                    {visibleColumns.duration && (
+                                                        <td className="text-center">
+                                                            {sheet.catchStatus === 'Running' ? '' : sheet.duration || ''}
+                                                        </td>
+                                                    )}
                                                     {visibleColumns.currentProcess && <td className="text-center">{sheet.currentProcessName}</td>}
 
                                                     {visibleColumns.innerEnvelope && <td className="text-center">{sheet.innerEnvelope}</td>}
                                                     {visibleColumns.outerEnvelope && <td className="text-center">{sheet.outerEnvelope || ''}</td>}
-                                                  
+
+
 
                                                 </tr>,
                                                 sheet.showProcessDetails && (
@@ -1395,25 +2164,33 @@ const ProjectReport = () => {
                                 </Table>
 
                                 <div className="d-flex justify-content-between align-items-center mt-3">
-                                    <div className="text-muted" style={{
-                                        fontSize: "0.95rem",
-                                        fontWeight: "500",
-                                        padding: "8px 12px",
-                                        backgroundColor: "#f8f9fa",
-                                        boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
-                                    }}>
-                                        <span className="text-primary">Showing</span>{" "}
-                                        <span className="fw-bold">
-                                            {filteredSheets.length > 0 ? currentPage * recordsPerPage + 1 : 0}
-                                        </span>{" "}
-                                        <span className="text-primary">to</span>{" "}
-                                        <span className="fw-bold">
-                                            {Math.min((currentPage + 1) * recordsPerPage, filteredSheets.length)}
-                                        </span>{" "}
-                                        <span className="text-primary">of</span>{" "}
-                                        <span className="text-danger">{filteredSheets.length}</span>{" "}
-                                        <span className="text-primary">Records</span>
-                                    </div>
+                                <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                backgroundColor: '#f8f9fa',
+                                color: '#495057',
+                                fontWeight: '500',
+                                fontSize: '0.9rem',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                border: '1px solid rgba(0,0,0,0.05)'
+                            }}>
+                                <FaTable style={{ marginRight: '8px', color: '#4a90e2' }} />
+                                <span>Showing </span>
+                                <span style={{ fontWeight: '600', color: '#4a90e2', margin: '0 4px' }}>
+                                    {filteredSheets.length > 0 ? currentPage * recordsPerPage + 1 : 0}
+                                </span>
+                                <span> to </span>
+                                <span style={{ fontWeight: '600', color: '#4a90e2', margin: '0 4px' }}>
+                                    {Math.min((currentPage + 1) * recordsPerPage, filteredSheets.length)}
+                                </span>
+                                <span> of </span>
+                                <span style={{ fontWeight: '600', color: '#f5365c', margin: '0 4px' }}>
+                                    {filteredSheets.length}
+                                </span>
+                                <span> Records</span>
+                            </div>
 
                                     <ul className="pagination mb-0">
                                         <li className={`page-item ${currentPage === 0 ? 'disabled' : ''}`}>
@@ -1465,29 +2242,27 @@ const ProjectReport = () => {
                                 </div>
                             </div>
                         ) : (
-                            viewMode === 'catch' ? (
-                                <CatchDetails
-                                    catchData={selectedCatch}
-                                    projectName={selectedProjectId}
-                                    groupName={groups[selectedGroup]}
-                                />
-                            ) : (
-                                <ProcessDetails
-                                    catchData={selectedCatch}
-                                    projectName={selectedProjectId}
-                                    groupName={groups[selectedGroup]}
-                                />
-                            )
+                            <>
+                                {viewMode === 'catch' ? (
+                                    <CatchDetails
+                                        catchData={selectedCatch}
+                                        projectName={selectedProjectId}
+                                        groupName={groups[selectedGroup]}
+                                    />
+                                ) : (
+                                    <ProcessDetails
+                                        catchData={selectedCatch}
+                                        projectName={selectedProjectId}
+                                        groupName={groups[selectedGroup]}
+                                    />
+                                )}
+                            </>
                         )}
-                    </Col>
-                </Row>
+                    </div>
+
             )}
-
-
         </Container>
     );
 };
 
 export default ProjectReport;
-
-
