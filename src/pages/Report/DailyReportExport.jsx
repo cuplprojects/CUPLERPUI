@@ -32,7 +32,9 @@ const DailyReportExport = ({
   types,
   // Quick Task data
   quickTaskData,
-  userMap
+  userMap,
+  quickTaskGroupMap,
+  quickTaskProjectMap
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportType, setExportType] = useState(null);
@@ -358,27 +360,49 @@ const DailyReportExport = ({
       // Define headers for quick task data
       const headers = [
         'S.No',
-        'Triggered By A',
-        'Triggered By B',
-        'Time Difference (Min)',
-        'Date Range'
+        'Name',
+        'Project Name',
+        'Group Name',
+        'Catch No',
+        'Quantity',
+        'Start Time',
+        'End Time',
+        'Time Difference (Min)'
       ];
 
       // Prepare data for Excel
       const wsData = [headers];
 
+      // Helper functions for getting names
+      const getQuickTaskProjectName = (projectId) => {
+        if (!projectId) return 'N/A';
+        return quickTaskProjectMap[projectId] || `Project ${projectId}`;
+      };
+
+      const getQuickTaskGroupName = (groupId) => {
+        if (!groupId) return 'N/A';
+        return quickTaskGroupMap[groupId] || `Group ${groupId}`;
+      };
+
       // Add quick task data rows
       quickTaskData.forEach((task, index) => {
-        const dateRange = task.loggedAT_A && task.loggedAT_B ?
-          `${new Date(task.loggedAT_A).toLocaleDateString('en-GB')} - ${new Date(task.loggedAT_B).toLocaleDateString('en-GB')}` :
+        const startTime = task.loggedAT_A ?
+          new Date(task.loggedAT_A).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) :
+          'N/A';
+        const endTime = task.loggedAT_B ?
+          new Date(task.loggedAT_B).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) :
           'N/A';
 
         const row = [
           index + 1,
           userMap[task.triggeredBy_A] || `User ${task.triggeredBy_A}`,
-          userMap[task.triggeredBy_B] || `User ${task.triggeredBy_B}`,
-          task.timeDifferenceMinutes || 0,
-          dateRange
+          getQuickTaskProjectName(task.projectId),
+          getQuickTaskGroupName(task.groupId),
+          task.catchNo || 'N/A',
+          task.quantity || 'N/A',
+          startTime,
+          endTime,
+          task.timeDifferenceMinutes || 0
         ];
         wsData.push(row);
       });
@@ -389,10 +413,14 @@ const DailyReportExport = ({
       // Set column widths
       ws['!cols'] = [
         { wch: 8 },   // S.No
-        { wch: 20 },  // Triggered By A
-        { wch: 20 },  // Triggered By B
-        { wch: 18 },  // Time Difference
-        { wch: 25 }   // Date Range
+        { wch: 20 },  // Name
+        { wch: 25 },  // Project Name
+        { wch: 20 },  // Group Name
+        { wch: 15 },  // Catch No
+        { wch: 12 },  // Quantity
+        { wch: 15 },  // Start Time
+        { wch: 15 },  // End Time
+        { wch: 18 }   // Time Difference
       ];
 
       // Add worksheet to workbook
@@ -768,26 +796,44 @@ const DailyReportExport = ({
         right: 15
       };
 
+      // Helper functions for getting names
+      const getQuickTaskProjectName = (projectId) => {
+        if (!projectId) return 'N/A';
+        return quickTaskProjectMap[projectId] || `Project ${projectId}`;
+      };
+
+      const getQuickTaskGroupName = (groupId) => {
+        if (!groupId) return 'N/A';
+        return quickTaskGroupMap[groupId] || `Group ${groupId}`;
+      };
+
       // Prepare quick task data for table
       const quickTaskTableData = [];
       quickTaskData.forEach((task, index) => {
-        const dateRange = task.loggedAT_A && task.loggedAT_B ?
-          `${new Date(task.loggedAT_A).toLocaleDateString('en-GB')} - ${new Date(task.loggedAT_B).toLocaleDateString('en-GB')}` :
+        const startTime = task.loggedAT_A ?
+          new Date(task.loggedAT_A).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) :
+          'N/A';
+        const endTime = task.loggedAT_B ?
+          new Date(task.loggedAT_B).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) :
           'N/A';
 
         const row = [
           index + 1,
           userMap[task.triggeredBy_A] || `User ${task.triggeredBy_A}`,
-          userMap[task.triggeredBy_B] || `User ${task.triggeredBy_B}`,
-          task.timeDifferenceMinutes || 0,
-          dateRange
+          getQuickTaskProjectName(task.projectId),
+          getQuickTaskGroupName(task.groupId),
+          task.catchNo || 'N/A',
+          task.quantity || 'N/A',
+          startTime,
+          endTime,
+          task.timeDifferenceMinutes || 0
         ];
         quickTaskTableData.push(row);
       });
 
       // Create the quick task table
       doc.autoTable({
-        head: [['S.No', 'Triggered By A', 'Triggered By B', 'Time Diff (Min)', 'Date Range']],
+        head: [['S.No', 'Name', 'Project Name', 'Group Name', 'Catch No', 'Quantity', 'Start Time', 'End Time', 'Time Diff (Min)']],
         body: quickTaskTableData,
         startY: 35,
         margin: margins,
@@ -810,11 +856,15 @@ const DailyReportExport = ({
           cellPadding: { top: 8, right: 4, bottom: 8, left: 4 }
         },
         columnStyles: {
-          0: { cellWidth: '8%' },   // S.No
-          1: { cellWidth: '25%' },  // Triggered By A
-          2: { cellWidth: '25%' },  // Triggered By B
-          3: { cellWidth: '15%' },  // Time Difference
-          4: { cellWidth: '27%' }   // Date Range
+          0: { cellWidth: '6%' },   // S.No
+          1: { cellWidth: '15%' },  // Name
+          2: { cellWidth: '18%' },  // Project Name
+          3: { cellWidth: '15%' },  // Group Name
+          4: { cellWidth: '12%' },  // Catch No
+          5: { cellWidth: '10%' },  // Quantity
+          6: { cellWidth: '12%' },  // Start Time
+          7: { cellWidth: '12%' },  // End Time
+          8: { cellWidth: '10%' }   // Time Difference
         },
         theme: 'grid',
         tableLineColor: [200, 200, 200],

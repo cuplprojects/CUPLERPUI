@@ -23,6 +23,7 @@ import { CSSTransition } from "react-transition-group";
 import styled from "styled-components";
 import { getAllProjectCompletionPercentages } from "../CustomHooks/ApiServices/transacationService";
 import { useTranslation } from "react-i18next";
+import { NoticeBoard, NoticeBoardButton } from "./../pages/DailyTask/TodayTaskIcon";
 
 const AnimatedDropdownMenu = styled(Dropdown.Menu)`
   &.dropdown-enter {
@@ -74,6 +75,7 @@ const CuDashboard = () => {
   const carouselRef = useRef(null);
   const [hasquantitySheet, setHasquantitySheet] = useState([]);
   const [activeCard, setActiveCard] = useState(null);
+  const [dispatchData, setDispatchData] = useState([]);
   const [visibleCards, setVisibleCards] = useState(() => {
     const savedState = localStorage.getItem("visibleCards");
     return savedState
@@ -99,6 +101,7 @@ const CuDashboard = () => {
   const [page, setPage] = useState(1);
   const pageSize = 5; // Number of projects per page
   const [hasMore, setHasMore] = useState(true);
+  const [showNoticeBoard, setShowNoticeBoard] = useState(false);
 
   // funtion to handle the disabled projects
   const hasDisable = (projectid) => {
@@ -107,6 +110,35 @@ const CuDashboard = () => {
     );
     return hasQuantitySheet ? hasQuantitySheet.quantitySheet : false;
   };
+
+  //service not applied
+  // useEffect(() => {
+  //   // Fetch data from the API
+  //   axios.get('https://localhost:7212/api/Dispatch/dispatch-summary-today')
+  //     .then(response => {
+  //       setDispatchData(response.data); 
+  //       console.log(response.data)// Store the data in state
+  //     })
+
+  //     .catch(error => {
+  //       console.error('Error fetching dispatch data:', error);
+  //     });
+  // }, []); // Empty array ensures the API call runs only once after the first render
+
+
+  useEffect(() => {
+    // Fetch data from the API using the custom Axios instance
+    API.get('/Dispatch/dispatch-summary-today')
+      .then(response => {
+        setDispatchData(response.data); // Store the data in state
+        console.log(response.data);
+      })
+      .catch(error => {
+        console.error('Error fetching dispatch data:', error);
+      });
+  }, []); // Empty array ensures the API call runs only once after the first render
+
+
 
   useEffect(() => {
     fetchProjects(1); // Load initial set of projects
@@ -292,8 +324,15 @@ const CuDashboard = () => {
               </Col>
             ))}
           </Row>
+          <NoticeBoardButton
+            onClick={() => setShowNoticeBoard(!showNoticeBoard)}
+            showNoticeBoard={showNoticeBoard}
+            customDark={customDark}
+            customLightText={customLightText}
+            style={{ marginLeft: 'auto', marginRight: hasMore ? '10px' : '0' }}
+          />
           {hasMore && (
-            <div className="text-center mt-3">
+            <>
               <MdExpandMore
                 onClick={() => fetchProjects(page + 1)}
                 style={{
@@ -302,7 +341,7 @@ const CuDashboard = () => {
                 }}
                 className={`${isLoading ? 'opacity-50' : ''} ${customDark} ${customLightText} rounded-5`}
               />
-            </div>
+            </>
           )}
         </>
       );
@@ -375,8 +414,12 @@ const CuDashboard = () => {
               {carouselItems}
             </Carousel>
           </div>
+          <div className="d-flex justify-content-between align-items-center mt-3">
+          
+          
           {hasMore && (
             <div className="text-center mt-3">
+              
               <Button
                 onClick={() => fetchProjects(page + 1)}
                 disabled={isLoading}
@@ -390,6 +433,14 @@ const CuDashboard = () => {
               </Button>
             </div>
           )}
+
+          <NoticeBoardButton
+            onClick={() => setShowNoticeBoard(!showNoticeBoard)}
+            showNoticeBoard={showNoticeBoard}
+            customDark={customDark}
+            customLightText={customLightText}
+          />
+          </div>
         </>
       );
     }
@@ -415,8 +466,16 @@ const CuDashboard = () => {
             ))}
           </div>
         </ScrollableContainer>
-        {hasMore && (
-          <div className="text-center mt-3">
+       
+          <div className="d-flex justify-content-between align-items-center mt-3">
+            <NoticeBoardButton
+              onClick={() => setShowNoticeBoard(!showNoticeBoard)}
+              showNoticeBoard={showNoticeBoard}
+              customDark={customDark}
+              customLightText={customLightText}
+              style={{ marginLeft: 'auto', marginRight: '10px' }}
+            /> 
+            {hasMore && (
             <Button
               onClick={() => fetchProjects(page + 1)}
               disabled={isLoading}
@@ -424,8 +483,18 @@ const CuDashboard = () => {
             >
               {isLoading ? t("loading") : t("showMore")}
             </Button>
-          </div>
         )}
+        </div>
+        {/* {!hasMore && (
+          <div className="d-flex justify-content-end mt-3">
+            <NoticeBoardButton
+              onClick={() => setShowNoticeBoard(!showNoticeBoard)}
+              showNoticeBoard={showNoticeBoard}
+              customDark={customDark}
+              customLightText={customLightText}
+            />
+          </div>
+        )} */}
       </>
     );
   };
@@ -591,6 +660,14 @@ const CuDashboard = () => {
           </Col>
         )}
       </Row>
+
+      {/* Notice Board Component */}
+      <NoticeBoard
+        show={showNoticeBoard}
+        onHide={() => setShowNoticeBoard(false)}
+        dispatchData={dispatchData}
+      />
+
     </Container>
   );
 };

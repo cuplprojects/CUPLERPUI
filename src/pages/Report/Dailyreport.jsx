@@ -555,6 +555,10 @@ const DailyReport = ({ date }) => {
     // Add state for Quick Task name filter
     const [quickTaskNameFilter, setQuickTaskNameFilter] = useState('');
 
+    // Add state for Quick Task group and project maps
+    const [quickTaskGroupMap, setQuickTaskGroupMap] = useState({});
+    const [quickTaskProjectMap, setQuickTaskProjectMap] = useState({});
+
     // Filter Quick Task data based on name filter
     const filteredQuickTaskData = quickTaskData.filter(task => {
         if (!quickTaskNameFilter.trim()) return true;
@@ -624,6 +628,8 @@ const DailyReport = ({ date }) => {
         // Reset Quick Task data
         setQuickTaskData([]);
         setQuickTaskCurrentPage(1);
+        setQuickTaskGroupMap({});
+        setQuickTaskProjectMap({});
 
         // Hide report until View Report button is clicked
         setShowReport(false);
@@ -684,6 +690,8 @@ const DailyReport = ({ date }) => {
         // Reset Quick Task data
         setQuickTaskData([]);
         setQuickTaskCurrentPage(1);
+        setQuickTaskGroupMap({});
+        setQuickTaskProjectMap({});
 
         // Hide report until View Report button is clicked
         setShowReport(false);
@@ -1182,12 +1190,20 @@ const DailyReport = ({ date }) => {
             };
 
             // Prepare API parameters
-            const params = {};
+            const params = {
+                page: 1,
+                pageSize: 10000 // Get all records at once for pagination handling on frontend
+            };
 
-            // Use start date for quick completion data
-            if (startDate) {
+            // Use date range if both start and end dates are provided
+            if (startDate && endDate) {
+                params.startDate = formatDateForApi(startDate);
+                params.endDate = formatDateForApi(endDate);
+                console.log('Using date range for quick completion:', params.startDate, 'to', params.endDate);
+            } else if (startDate) {
+                // Use start date as a single date if end date is not provided
                 params.date = formatDateForApi(startDate);
-                console.log('Using date for quick completion:', params.date);
+                console.log('Using single date for quick completion:', params.date);
             }
 
             console.log('API params for QuickCompletion:', params);
@@ -1195,9 +1211,49 @@ const DailyReport = ({ date }) => {
             console.log('QuickCompletion API Response:', response);
             console.log('QuickCompletion API Response data:', response.data);
 
-            if (Array.isArray(response.data)) {
-                setQuickTaskData(response.data);
-                console.log('Set quickTaskData with', response.data.length, 'items');
+            if (response.data && response.data.items && Array.isArray(response.data.items)) {
+                const quickTaskItems = response.data.items;
+                setQuickTaskData(quickTaskItems);
+                console.log('Set quickTaskData with', quickTaskItems.length, 'items');
+
+                // Extract unique group and project IDs
+                const uniqueGroupIds = [...new Set(quickTaskItems.map(item => item.groupId).filter(id => id))];
+                const uniqueProjectIds = [...new Set(quickTaskItems.map(item => item.projectId).filter(id => id))];
+
+                console.log('Unique Group IDs:', uniqueGroupIds);
+                console.log('Unique Project IDs:', uniqueProjectIds);
+
+                // Fetch group names
+                if (uniqueGroupIds.length > 0) {
+                    await fetchQuickTaskGroupNames(uniqueGroupIds);
+                }
+
+                // Fetch project names
+                if (uniqueProjectIds.length > 0) {
+                    await fetchQuickTaskProjectNames(uniqueProjectIds);
+                }
+            } else if (Array.isArray(response.data)) {
+                // Fallback for direct array response
+                const quickTaskItems = response.data;
+                setQuickTaskData(quickTaskItems);
+                console.log('Set quickTaskData with', quickTaskItems.length, 'items');
+
+                // Extract unique group and project IDs from direct array
+                const uniqueGroupIds = [...new Set(quickTaskItems.map(item => item.groupId).filter(id => id))];
+                const uniqueProjectIds = [...new Set(quickTaskItems.map(item => item.projectId).filter(id => id))];
+
+                console.log('Unique Group IDs:', uniqueGroupIds);
+                console.log('Unique Project IDs:', uniqueProjectIds);
+
+                // Fetch group names
+                if (uniqueGroupIds.length > 0) {
+                    await fetchQuickTaskGroupNames(uniqueGroupIds);
+                }
+
+                // Fetch project names
+                if (uniqueProjectIds.length > 0) {
+                    await fetchQuickTaskProjectNames(uniqueProjectIds);
+                }
             } else {
                 console.log('Response data is not an array:', typeof response.data);
                 setQuickTaskData([]);
@@ -1206,6 +1262,57 @@ const DailyReport = ({ date }) => {
         } catch (error) {
             console.error("Error fetching quick task data:", error);
             setQuickTaskData([]);
+        }
+    };
+
+    // Function to fetch group names for Quick Task
+    const fetchQuickTaskGroupNames = async (groupIds) => {
+        try {
+            const groupMap = {};
+            // Fetch all groups once instead of multiple calls
+            const response = await API.get(`/Reports/GetAllGroups`);
+
+            groupIds.forEach(groupId => {
+                const group = response.data.find(g => g.id === groupId);
+                if (group) {
+                    groupMap[groupId] = group.name;
+                } else {
+                    groupMap[groupId] = `Group ${groupId}`;
+                }
+            });
+
+            setQuickTaskGroupMap(groupMap);
+            console.log('Quick Task Group Map:', groupMap);
+        } catch (error) {
+            console.error("Error fetching quick task group names:", error);
+            // Create fallback map
+            const fallbackMap = {};
+            groupIds.forEach(groupId => {
+                fallbackMap[groupId] = `Group ${groupId}`;
+            });
+            setQuickTaskGroupMap(fallbackMap);
+        }
+    };
+
+    // Function to fetch project names for Quick Task
+    const fetchQuickTaskProjectNames = async (projectIds) => {
+        try {
+            const projectMap = {};
+            const projectPromises = projectIds.map(async (projectId) => {
+                try {
+                    const response = await API.get(`/Project/${projectId}`);
+                    projectMap[projectId] = response.data.name;
+                } catch (error) {
+                    console.error(`Error fetching project ${projectId}:`, error);
+                    projectMap[projectId] = `Project ${projectId}`;
+                }
+            });
+
+            await Promise.all(projectPromises);
+            setQuickTaskProjectMap(projectMap);
+            console.log('Quick Task Project Map:', projectMap);
+        } catch (error) {
+            console.error("Error fetching quick task project names:", error);
         }
     };
 
@@ -1355,6 +1462,18 @@ const DailyReport = ({ date }) => {
         if (machineId === 0) return 'N/A';
         if (machineId === undefined || machineId === null) return 'N/A';
         return machineMap[machineId] || `Machine ${machineId}`;
+    };
+
+    // Get group name by ID for Quick Task
+    const getQuickTaskGroupName = (groupId) => {
+        if (!groupId) return 'N/A';
+        return quickTaskGroupMap[groupId] || `Group ${groupId}`;
+    };
+
+    // Get project name by ID for Quick Task
+    const getQuickTaskProjectName = (projectId) => {
+        if (!projectId) return 'N/A';
+        return quickTaskProjectMap[projectId] || `Project ${projectId}`;
     };
 
     // Get project name by ID
@@ -2570,6 +2689,8 @@ const DailyReport = ({ date }) => {
                                         // Quick Task data
                                         quickTaskData={quickTaskData}
                                         userMap={userMap}
+                                        quickTaskGroupMap={quickTaskGroupMap}
+                                        quickTaskProjectMap={quickTaskProjectMap}
                                     />
 
 
@@ -3395,38 +3516,70 @@ const DailyReport = ({ date }) => {
                                                             borderBottom: '1px solid #e9ecef'
                                                         }}>
                                                             <th style={{
-                                                                padding: '10px 12px',
+                                                                padding: '8px 10px',
                                                                 fontSize: '0.8rem',
                                                                 fontWeight: '600',
                                                                 color: '#2c3e50',
                                                                 textAlign: 'center',
-                                                                borderTop: 'none'
+                                                                borderTop: 'none',
+                                                                width: '60px'
                                                             }}>S.No</th>
                                                             <th style={{
-                                                                padding: '10px 12px',
+                                                                padding: '8px 10px',
                                                                 fontSize: '0.8rem',
                                                                 fontWeight: '600',
                                                                 color: '#2c3e50',
                                                                 textAlign: 'center',
-                                                                borderTop: 'none'
+                                                                borderTop: 'none',
+                                                                width: '120px'
                                                             }}>Name</th>
+                                                             <th style={{
+                                                                padding: '8px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: '600',
+                                                                color: '#2c3e50',
+                                                                textAlign: 'center',
+                                                                borderTop: 'none',
+                                                                width: '120px'
+                                                            }}>Group Name</th>
+                                                            <th style={{
+                                                                padding: '8px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: '600',
+                                                                color: '#2c3e50',
+                                                                textAlign: 'center',
+                                                                borderTop: 'none',
+                                                                width: '140px'
+                                                            }}>Project Name</th>
+                                                           
+                                                            <th style={{
+                                                                padding: '8px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: '600',
+                                                                color: '#2c3e50',
+                                                                textAlign: 'center',
+                                                                borderTop: 'none',
+                                                                width: '100px'
+                                                            }}>Catch No</th>
+                                                            <th style={{
+                                                                padding: '8px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: '600',
+                                                                color: '#2c3e50',
+                                                                textAlign: 'center',
+                                                                borderTop: 'none',
+                                                                width: '100px'
+                                                            }}>Quantity</th>
+                                                            <th style={{
+                                                                padding: '8px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: '600',
+                                                                color: '#2c3e50',
+                                                                textAlign: 'center',
+                                                                borderTop: 'none',
+                                                                width: '160px'
+                                                            }}>Time Difference</th>
                                                             
-                                                            <th style={{
-                                                                padding: '10px 12px',
-                                                                fontSize: '0.8rem',
-                                                                fontWeight: '600',
-                                                                color: '#2c3e50',
-                                                                textAlign: 'center',
-                                                                borderTop: 'none'
-                                                            }}>Time Difference (Min)</th>
-                                                            <th style={{
-                                                                padding: '10px 12px',
-                                                                fontSize: '0.8rem',
-                                                                fontWeight: '600',
-                                                                color: '#2c3e50',
-                                                                textAlign: 'center',
-                                                                borderTop: 'none'
-                                                            }}>Date Range</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -3438,7 +3591,7 @@ const DailyReport = ({ date }) => {
                                                                 backgroundColor: index % 2 === 0 ? 'white' : '#f8f9fa'
                                                             }}>
                                                                 <td style={{
-                                                                    padding: '8px 12px',
+                                                                    padding: '6px 8px',
                                                                     fontSize: '0.8rem',
                                                                     textAlign: 'center',
                                                                     borderTop: '1px solid #e9ecef'
@@ -3446,34 +3599,70 @@ const DailyReport = ({ date }) => {
                                                                     {((quickTaskCurrentPage - 1) * quickTaskPageSize) + index + 1}
                                                                 </td>
                                                                 <td style={{
-                                                                    padding: '8px 12px',
+                                                                    padding: '6px 8px',
                                                                     fontSize: '0.8rem',
                                                                     textAlign: 'center',
                                                                     borderTop: '1px solid #e9ecef'
                                                                 }}>
                                                                     {userMap[task.triggeredBy_A] || `User ${task.triggeredBy_A}`}
                                                                 </td>
+                                                                 <td style={{
+                                                                    padding: '6px 8px',
+                                                                    fontSize: '0.8rem',
+                                                                    textAlign: 'center',
+                                                                    borderTop: '1px solid #e9ecef'
+                                                                }}>
+                                                                    {getQuickTaskGroupName(task.groupId)}
+                                                                </td>
+                                                                <td style={{
+                                                                    padding: '6px 8px',
+                                                                    fontSize: '0.8rem',
+                                                                    textAlign: 'center',
+                                                                    borderTop: '1px solid #e9ecef'
+                                                                }}>
+                                                                    {getQuickTaskProjectName(task.projectId)}
+                                                                </td>
                                                                
                                                                 <td style={{
-                                                                    padding: '8px 12px',
+                                                                    padding: '6px 8px',
                                                                     fontSize: '0.8rem',
                                                                     textAlign: 'center',
                                                                     borderTop: '1px solid #e9ecef'
                                                                 }}>
-                                                                    {task.timeDifferenceMinutes}
+                                                                    {task.catchNo || 'N/A'}
                                                                 </td>
                                                                 <td style={{
-                                                                    padding: '8px 12px',
+                                                                    padding: '6px 8px',
                                                                     fontSize: '0.8rem',
                                                                     textAlign: 'center',
                                                                     borderTop: '1px solid #e9ecef'
                                                                 }}>
-                                                                    {task.loggedAT_A && task.loggedAT_B ? (
-                                                                        <span>
-                                                                            {new Date(task.loggedAT_A).toLocaleDateString('en-GB')} - {new Date(task.loggedAT_B).toLocaleDateString('en-GB')}
-                                                                        </span>
-                                                                    ) : 'N/A'}
+                                                                    {task.quantity || 'N/A'}
                                                                 </td>
+                                                                <td style={{
+                                                                    padding: '8px 6px',
+                                                                    fontSize: '0.8rem',
+                                                                    textAlign: 'center',
+                                                                    borderTop: '1px solid #e9ecef',
+                                                                    lineHeight: '1.3'
+                                                                }}>
+                                                                    {task.loggedAT_A && task.loggedAT_B ? (
+                                                                        <div>
+                                                                            <div style={{ marginBottom: '3px' }}>
+                                                                                <strong>Start:</strong> {new Date(task.loggedAT_A).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                                            </div>
+                                                                            <div style={{ marginBottom: '3px' }}>
+                                                                                <strong>End:</strong> {new Date(task.loggedAT_B).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                                            </div>
+                                                                            <div style={{ color: '#28a745', fontWeight: 'bold' }}>
+                                                                                <strong>Diff:</strong> {task.timeDifferenceMinutes} min
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span style={{ color: '#6c757d' }}>N/A</span>
+                                                                    )}
+                                                                </td>
+                                                              
                                                             </tr>
                                                         ))}
                                                     </tbody>
