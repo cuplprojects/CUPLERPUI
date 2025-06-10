@@ -196,9 +196,10 @@ const CuDashboard = () => {
         }
       });
       setPage(pageNumber);
-
+      const isFirstPageWithStarred = pageNumber === 1 && starredProjectId;
+      const expectedPageSize = isFirstPageWithStarred ? pageSize + 1 : pageSize;
       // Set hasMore based on whether we received a full page of results
-      setHasMore(finalData.length === pageSize);
+      setHasMore(finalData.length === expectedPageSize);
 
     } catch (error) {
       console.error("Error fetching data:", error);
