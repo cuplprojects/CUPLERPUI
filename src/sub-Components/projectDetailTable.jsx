@@ -51,7 +51,11 @@ const ProjectDetailsTable = ({
   lotNo,
   fetchTransactions,
   handleLotClick,
-  projectLots
+  projectLots,
+  setShowBarChart,
+  showBarChart,
+  setShowPieChart,
+  showPieChart
 }) => {
   //Theme Change Section
   const { t } = useTranslation();
@@ -92,7 +96,7 @@ const ProjectDetailsTable = ({
   const [remarksModalShow, setRemarksModalShow] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [showOptions, setShowOptions] = useState(false);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [alarmModalData, setAlarmModalData] = useState(null);
   const [interimQuantityModalData, setInterimQuantityModalData] =
@@ -899,7 +903,7 @@ console.log(tableData)
               <Tippy
                 duration={[300, 1]}
                 delay={10}
-                className={`${customMid} ${customLightText} p-2 border border-dark rounded-3`}
+                className={`${customLight} ${customDarkText} p-2 border fw-bold border-dark rounded-3`}
                 content={requirements.map((req, index) => (
                   <div key={index}>{req}</div>
                 ))}
@@ -1544,6 +1548,33 @@ console.log(tableData)
 
 
                     <Menu.Divider />
+
+                    {/* New Filters */}
+                    <Menu.Item>
+                      <div>
+                        <Switch
+                        checked={showBarChart}
+                        onChange={() => setShowBarChart(!showBarChart)}
+                        />
+                        <span className={`ms-2 ${customDarkText}`}>
+                          {t("showCatchData")}
+                        </span>
+                      </div>
+                    </Menu.Item>
+
+                    <Menu.Divider />
+
+                    <Menu.Item>
+                      <div>
+                        <Switch
+                        checked={showPieChart}
+                        onChange={() => setShowPieChart(!showPieChart)}
+                        />
+                        <span className={`ms-2 ${customDarkText}`}>
+                          {t("showCompletionPercentage")}
+                        </span>
+                      </div>
+                    </Menu.Item>
 
                     <Menu.Item onClick={(e) => e.stopPropagation()}>
                       {" "}

@@ -186,7 +186,7 @@ const EditProjectModal = ({
                   placeholder={t('enterProjectName')}
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
-                  disabled={!selectedGroup || !selectedType}
+                  //disabled={!selectedGroup || !selectedType}
                 />
               </Form.Item>
             </Col>

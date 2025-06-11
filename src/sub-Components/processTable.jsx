@@ -947,33 +947,6 @@ const ProcessTable = () => {
 
       )}
 
-      {/* <Row>
-        <Col lg={12} md={12} className="pe-0">
-          <div className="d-flex flex-wrap gap-2 justify-content-center">
-            {projectLots.map((lot, index) => (
-              <button
-                key={index}
-                className={`${selectedLot === lot.lotNo
-                    ? "bg-white text-dark border-dark"
-                    : customBtn
-                  } ${customDark === "dark-dark" ? "border" : "custom-light-border"
-                  } d-flex align-items-center justify-content-center p-2 rounded-2 ${customDark === "dark-dark"
-                    ? "text-dark border-dark"
-                    : "text-dark"
-                  } ${customDarkBorder}`}
-                onClick={() => handleLotClick(lot.lotNo)}
-                style={{
-                  minWidth: "100px",
-                  transition: "all 0.2s",
-                }}
-              >
-                {t("lot")} {lot.lotNo}
-              </button>
-            ))}
-          </div>
-        </Col>
-      </Row> */}
-
       {processName === "Dispatch" ? (
         <DispatchPage
           projectId={selectedProject?.value || id}
@@ -1008,6 +981,10 @@ const ProcessTable = () => {
                     processId={processId}
                     projectLots={projectLots}
                     handleLotClick={handleLotClick}
+                    setShowBarChart={setShowBarChart}
+                    showBarChart={showBarChart}
+                    setShowPieChart={setShowPieChart}
+                    showPieChart={showPieChart}
                   />
                 )}
               </Col>
@@ -1019,28 +996,6 @@ const ProcessTable = () => {
       )}
 
       <Row className="mb-4 d-flex justify-content-between">
-        <Col lg={8} md={12} className="mb-1">
-          <div className="d-flex align-items-center gap-4">
-            <div>
-              <Switch
-                checked={showBarChart}
-                onChange={() => setShowBarChart(!showBarChart)}
-              />
-              <span className={`ms-2 ${customDarkText}`}>
-                {t("showCatchData")}
-              </span>
-            </div>
-            <div>
-              <Switch
-                checked={showPieChart}
-                onChange={() => setShowPieChart(!showPieChart)}
-              />
-              <span className={`ms-2 ${customDarkText}`}>
-                {t("showCompletionPercentage")}
-              </span>
-            </div>
-          </div>
-        </Col>
 
         {showBarChart && (
           <Col

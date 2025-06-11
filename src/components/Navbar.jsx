@@ -12,6 +12,9 @@ import { useStore } from 'zustand';
 import { Link } from 'react-router-dom';
 import useUserDataStore, { useUserData, useUserDataActions } from '../store/userDataStore';
 import SampleUser1 from "./../assets/sampleUsers/defaultUser.jpg";
+import { NoticeBoard, NoticeBoardButton } from './../pages/DailyTask/TodayTaskIcon';
+import API from './../CustomHooks/MasterApiHooks/api';
+
 const apiUrl = import.meta.env.VITE_API_BASE_URL;
 
 const Navbar = () => {
@@ -40,10 +43,23 @@ const Navbar = () => {
 
   const userData = useUserData();
   const { fetchUserData } = useUserDataActions();
+  const [showNoticeBoard, setShowNoticeBoard] = useState(false);
+  const [dispatchData, setDispatchData] = useState([]);
 
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
+
+  useEffect(() => {
+    API.get('/Dispatch/dispatch-summary-today')
+      .then(response => {
+        setDispatchData(response.data);
+        console.log(response.data);
+      })
+      .catch(error => {
+        console.error('Error fetching dispatch data:', error);
+      });
+  }, []);
 
   const toggleNav = () => {
     setShowNav(prev => !prev);
@@ -140,33 +156,27 @@ const Navbar = () => {
             </button>
           </Col>
           <Col xs={9} md={10} lg={10} className="d-flex align-items-center justify-content-center">
-            <Link to="/" className="ms-2 fw-bold fs-4 text-light " style={{textDecoration:"none"}}>CUPL | ApexERP</Link>
+            <Link to="/" className="ms-2 fw-bold fs-4 text-light " style={{ textDecoration: "none" }}>CUPL | ApexERP</Link>
           </Col>
           <Col xs={2} md={1} lg={1} className="d-flex align-items-center justify-content-end">
-          {/* used for notification */}
-            {/* <button
-              onClick={toggleNotificationMenu}
-              className="btn p-0 border-0 bg-transparent me-2"
-              aria-label="Toggle notification menu"
-              style={{ 
-                cursor: 'pointer',
-                width: '40px',
-                height: '40px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}
-            >
-              <RiNotification2Fill className="text-light custom-zoom-btn" style={{ fontSize: '24px' }} />
-            </button> */}
+            {/* used for notification */}
+
+            <NoticeBoardButton
+              onClick={() => setShowNoticeBoard(!showNoticeBoard)}
+              showNoticeBoard={showNoticeBoard}
+              customDark={customDark}
+              customLightText={customLightText}
+              style={{ marginLeft: 'auto', marginRight: '10px' }}
+            />
+
             <button
               onClick={toggleUserMenu}
               className="btn p-0 border-0 bg-transparent"
               aria-label="Toggle user menu"
-              style={{ 
-                cursor: 'pointer', 
-                width: '40px', 
-                height: '40px', 
+              style={{
+                cursor: 'pointer',
+                width: '40px',
+                height: '40px',
                 overflow: 'hidden',
                 padding: 0,
                 borderRadius: '50%',
@@ -175,7 +185,7 @@ const Navbar = () => {
                 alignItems: 'center',
                 flexShrink: 0
               }}
-              >
+            >
               <img
                 src={getProfileImageSrc()}
                 alt={`${userData?.firstName} ${userData?.lastName}`}
@@ -184,7 +194,7 @@ const Navbar = () => {
                   height: '100%',
                   objectFit: 'cover'
                 }}
-                />
+              />
             </button>
           </Col>
         </Row>
@@ -201,7 +211,7 @@ const Navbar = () => {
           opacity: showNav ? 1 : 0,
           // zIndex: 1,
         }}
-        >
+      >
         <NavigationBar onLinkClick={closeNav} onClose={closeNav} />
       </div>
 
@@ -218,7 +228,7 @@ const Navbar = () => {
           opacity: userMenu ? 1 : 0,
           // zIndex: 999,
         }}
-        >
+      >
         <UserMenu onClose={closeUserMenu} />
       </div>
 
@@ -239,6 +249,13 @@ const Navbar = () => {
       >
         <Notification onClose={closeNotification} />
       </div> */}
+
+      {/* Notice Board Component */}
+      <NoticeBoard
+        show={showNoticeBoard}
+        onHide={() => setShowNoticeBoard(false)}
+        dispatchData={dispatchData}
+      />
     </div>
   );
 };
